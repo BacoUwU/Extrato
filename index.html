@@ -202,16 +202,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
 
     <script>
-        (function() {
-            const tokenEsperado = "segredo123";
-            const urlParams = new URLSearchParams(window.location.search);
-            const tokenRecebido = urlParams.get("token");
-            if (tokenRecebido !== tokenEsperado) {
-                document.body.innerHTML = '<div class="p-6 text-center text-red-600 font-bold text-lg">🔒 Acesso negado. Token inválido.</div>';
-                throw new Error("Acesso negado");
-            }
-        })();
-
         pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
         
         let filesToProcess = [];
@@ -233,11 +223,33 @@
             if(savedUser || savedIds) showAlert("Informações de usuário salvas foram carregadas.");
         };
 
+        // ✅ CORREÇÃO: Função detectarBanco definida antes de ser usada
+        function detectarBanco(texto) {
+            const t = texto.toUpperCase();
+            if (t.includes("MERCADO PAGO")) return "mercado_pago";
+            if (t.includes("NU PAGAMENTOS") || t.includes("NUBANK")) return "nubank";
+            if (t.includes("ITAÚ UNIBANCO") || t.includes("ITAU")) return "itau";
+            if (t.includes("BRADESCO")) return "bradesco";
+            if (t.includes("CAIXA ECONÔMICA FEDERAL") || t.includes("CAIXA")) return "caixa";
+            if (t.includes("BANCO DO BRASIL")) return "bb";
+            if (t.includes("SANTANDER")) return "santander";
+            if (t.includes("BANCO INTER") || t.includes("INTER S.A")) return "inter";
+            if (t.includes("C6 BANK")) return "c6";
+            if (t.includes("PICPAY")) return "picpay";
+            if (t.includes("RECARGAPAY")) return "recargapay";
+            if (t.includes("PAGBANK") || t.includes("PAGSEGURO")) return "pagbank";
+            if (t.includes("NEON")) return "neon";
+            if (t.includes("BANCO PAN")) return "pan";
+            if (t.includes("SAFRA")) return "safra";
+            if (t.includes("SICREDI")) return "sicredi";
+            if (t.includes("SICOOB")) return "sicoob";
+            return "generico";
+        }
+
         pdfUpload.addEventListener('change', async (event) => {
             const newFiles = Array.from(event.target.files);
             for(const file of newFiles) {
                 if(!filesToProcess.some(f => f.name === file.name)) {
-                    // Pré-processa para detectar o banco
                     const fileText = await readPdfFile(file).catch(() => '');
                     const detectedBank = detectarBanco(fileText);
                     filesToProcess.push({ file, name: file.name, selectedBank: detectedBank, text: fileText, id: `file_${Date.now()}_${Math.random()}` });
