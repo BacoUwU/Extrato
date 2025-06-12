@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- ✅ 1. Evitar indexação (Google, Bing, etc) -->
     <meta name="robots" content="noindex, nofollow">
     <title>Analisador de Extrato Bancário Avançado</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -200,9 +199,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
 
     <script>
-        // ✅ 2. Acesso só por link secreto com token
         (function() {
-            const tokenEsperado = "segredo123"; // Troque por um código seguro
+            const tokenEsperado = "segredo123";
             const urlParams = new URLSearchParams(window.location.search);
             const tokenRecebido = urlParams.get("token");
             if (tokenRecebido !== tokenEsperado) {
@@ -503,9 +501,9 @@
 
         function getIdentifiers() {
              const u = document.getElementById('userName').value.trim().toLowerCase();
-             const iR = document.getElementById('identifiers').value.trim();
-             const aI = iR.toLowerCase().split(',').map(i => i.trim()).filter(Boolean);
-             return { raw: iR, all: [u, ...aI].filter(Boolean) };
+             const iR = document.getElementById('identifiers').value.trim().toLowerCase();
+             const aI = iR.split(',').map(i => i.trim()).filter(Boolean);
+             return { raw: document.getElementById('identifiers').value.trim(), all: [u, ...aI].filter(Boolean) };
         }
         function salvarIdentificacoes() { localStorage.setItem("userName", document.getElementById("userName").value.trim()); localStorage.setItem("userIdentifiers", document.getElementById("identifiers").value.trim()); showAlert("Identificações salvas com sucesso."); }
         function loadLearnedPatterns() { return JSON.parse(localStorage.getItem("aprendizadoTransacoes") || "{}"); }
