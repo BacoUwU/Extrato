@@ -88,7 +88,10 @@
                     <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
                         <div class="flex items-center gap-2">
                             <input type="checkbox" id="showSelfTransfers" class="h-4 w-4 rounded text-blue-600 focus:ring-blue-500" onchange="renderDashboard()">
-                            <label for="showSelfTransfers" class="text-sm font-medium text-gray-700">Incluir transferências para mim</label>
+                            <label for="showSelfTransfers" class="text-sm font-medium text-gray-700 flex items-center gap-1">
+                                Incluir transferências para mim
+                                <span class="cursor-pointer text-xs text-gray-500" title="Essas são transferências entre suas próprias contas. Elas não são consideradas renda, a menos que você marque aqui.">❓</span>
+                            </label>
                         </div>
                         <div>
                             <label class="text-sm font-medium text-gray-700 mr-2">Filtrar por tipo:</label>
@@ -230,13 +233,16 @@
             if(savedUser || savedIds) showAlert("Informações de usuário salvas foram carregadas.");
         };
 
-        pdfUpload.addEventListener('change', (event) => {
+        pdfUpload.addEventListener('change', async (event) => {
             const newFiles = Array.from(event.target.files);
-            newFiles.forEach(file => {
+            for(const file of newFiles) {
                 if(!filesToProcess.some(f => f.name === file.name)) {
-                    filesToProcess.push({ file, name: file.name, selectedBank: 'generico', id: `file_${Date.now()}_${Math.random()}` });
+                    // Pré-processa para detectar o banco
+                    const fileText = await readPdfFile(file).catch(() => '');
+                    const detectedBank = detectarBanco(fileText);
+                    filesToProcess.push({ file, name: file.name, selectedBank: detectedBank, text: fileText, id: `file_${Date.now()}_${Math.random()}` });
                 }
-            });
+            }
             renderFileList();
             processButton.disabled = filesToProcess.length === 0;
             event.target.value = '';
@@ -276,9 +282,11 @@
             }
             
             for (const fileWrapper of filesToProcess) {
-                const fileText = await readPdfFile(fileWrapper.file);
-                const parser = parsers[fileWrapper.selectedBank] || parsers.generico;
-                const transacoes = parser(fileText);
+                const parser = parsers[fileWrapper.selectedBank] || ((text) => {
+                    console.warn("Banco não reconhecido, usando parser genérico:", fileWrapper.selectedBank, fileWrapper.name);
+                    return parsers.generico(text);
+                });
+                const transacoes = parser(fileWrapper.text);
                 await classifyAndProcessTransactions(transacoes, identifiers.all, fileWrapper.selectedBank);
             }
             
@@ -460,8 +468,12 @@
         }
 
         function calculateCreditMetrics() {
-            const totalEntradas = income.reduce((s, t) => s + t.value, 0);
-            const totalSaidas = expenses.reduce((s, t) => s + t.value, 0); 
+            const showSelf = document.getElementById('showSelfTransfers').checked;
+            let transacoesParaCalculo = [...income, ...expenses];
+            if (showSelf) transacoesParaCalculo = transacoesParaCalculo.concat(selfTransfers);
+
+            const totalEntradas = transacoesParaCalculo.filter(t => t.value > 0).reduce((s, t) => s + t.value, 0);
+            const totalSaidas = transacoesParaCalculo.filter(t => t.value < 0).reduce((s, t) => s + t.value, 0); 
             const comprometimento = (totalEntradas > 0) ? (Math.abs(totalSaidas) / totalEntradas) : 0;
             return {
                 rendaLiquida: totalEntradas,
@@ -587,6 +599,17 @@
             bradesco: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+)\s(\d{1,3}(?:\.\d{3})*,\d{2})(\s+C|\s+D)?$/; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { let [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if(tipo && tipo.trim() === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
             caixa: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+\d+\s+(.+?)\s+([\d.,]+)\s+[DC]/; texto.split('\n').forEach(l => { const m = l.match(regex); if(m){ let [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if(l.endsWith('D')) v = -v; if(!isNaN(v)) transacoes.push({date:d, description:desc.trim(), value:v}); } }); return transacoes; },
             bb: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+(-?[\d.,]+,\d{2})/; texto.split('\n').forEach(l => { const m = l.match(regex); if(m) { const[_,d,desc,vS]=m; const v = parseValue(vS); if(!isNaN(v)) transacoes.push({date:d,description:desc.trim(),value:v}); } }); return transacoes; },
+            inter: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+(-?[\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
+            santander: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.{5,50})\s+(-?[\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
+            c6: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+([\d.,]+)\s+([DC])$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if (tipo === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
+            picpay: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+-?R?\$\s?([\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
+            recargapay: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+-?R?\$\s?([\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
+            pagbank: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+R?\$\s?([\d.,]+)\s+([CD])$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if (tipo === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
+            neon: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+-?R?\$\s?([\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
+            pan: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+([\d.,]+)\s+([DC])$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if (tipo === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
+            safra: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.{5,40})\s+(-?[\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
+            sicredi: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.{3,50})\s+([\d.,]+)\s+([CD])$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if (tipo === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
+            sicoob: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.{3,40})\s+([\d.,]+)\s+([CD])$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if (tipo === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
             generico: (texto) => { const transacoes = []; const regex = /(\d{2}\/\d{2}(\/\d{2,4})?)\s+(.+?)\s+(-?R?\$\s?)?(-?[\d.,]+,\d{2})/; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const date = m[1]; let desc = m[3]; const val = parseValue(m[5]); if (!isNaN(val)) transacoes.push({date, description:desc.trim(), value:val}); } }); return transacoes; }
         };
 
@@ -594,6 +617,9 @@
             if (income.length === 0 && expenses.length === 0) return showAlert("Não há dados para exportar.");
             const wb = XLSX.utils.book_new();
             
+            const showSelf = document.getElementById('showSelfTransfers').checked;
+            const selfData = showSelf ? selfTransfers.map(t => ({ Data: t.date, Banco: t.bank, Descrição: t.description, Valor: t.value })) : [];
+
             const incomeData = income.map(t => ({ Data: t.date, Banco: t.bank, Descrição: t.description, Valor: t.value }));
             const expenseData = expenses.map(t => ({ Data: t.date, Banco: t.bank, Descrição: t.description, Valor: t.value }));
             const historicoData = generateMonthlyHistory();
@@ -609,6 +635,10 @@
 
             const ws_entradas = XLSX.utils.json_to_sheet(incomeData);
             const ws_saidas = XLSX.utils.json_to_sheet(expenseData);
+            if (showSelf && selfData.length > 0) {
+                const ws_self = XLSX.utils.json_to_sheet(selfData);
+                XLSX.utils.book_append_sheet(wb, ws_self, "Para Mim");
+            }
             const ws_historico = XLSX.utils.json_to_sheet(historicoData);
             const ws_score = XLSX.utils.json_to_sheet(scoreData);
 
@@ -645,20 +675,21 @@
 
 
             const head = [['Data', 'Banco', 'Descrição', 'Valor']];
+            let startY = 75;
+
             if (income.length > 0) {
-                doc.autoTable({
-                    startY: 75, head: head, body: income.map(t => [t.date, t.bank, t.description, formatCurrency(t.value)]),
-                    headStyles: { fillColor: [22, 160, 133] },
-                    didDrawPage: (data) => { doc.setFontSize(14); doc.text("Entradas", 14, data.cursor.y - 10); }
-                });
+                doc.autoTable({ startY, head, body: income.map(t => [t.date, t.bank, t.description, formatCurrency(t.value)]), headStyles: { fillColor: [22, 160, 133] }, didDrawPage: (data) => { doc.setFontSize(14); doc.text("Entradas", 14, data.cursor.y - 10); } });
+                startY = doc.autoTable.previous.finalY + 10;
             }
             if (expenses.length > 0) {
-                doc.autoTable({
-                    head: head, body: expenses.map(t => [t.date, t.bank, t.description, formatCurrency(t.value)]),
-                    headStyles: { fillColor: [192, 57, 43] },
-                    didDrawPage: (data) => { doc.setFontSize(14); doc.text("Saídas", 14, data.cursor.y - 10); }
-                });
+                doc.autoTable({ startY, head, body: expenses.map(t => [t.date, t.bank, t.description, formatCurrency(t.value)]), headStyles: { fillColor: [192, 57, 43] }, didDrawPage: (data) => { doc.setFontSize(14); doc.text("Saídas", 14, data.cursor.y - 10); } });
+                startY = doc.autoTable.previous.finalY + 10;
             }
+            const showSelf = document.getElementById('showSelfTransfers').checked;
+            if (showSelf && selfTransfers.length > 0) {
+                doc.autoTable({ startY, head, body: selfTransfers.map(t => [t.date, t.bank, t.description, formatCurrency(t.value)]), headStyles: { fillColor: [149, 165, 166] }, didDrawPage: (data) => { doc.setFontSize(14); doc.text("Transferências Para Mim", 14, data.cursor.y - 10); } });
+            }
+
             doc.save(`Relatorio_Financeiro_${new Date().toISOString().slice(0,10)}.pdf`);
         }
         
