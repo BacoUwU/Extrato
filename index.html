@@ -223,7 +223,6 @@
             if(savedUser || savedIds) showAlert("Informações de usuário salvas foram carregadas.");
         };
 
-        // ✅ CORREÇÃO: Função detectarBanco definida antes de ser usada
         function detectarBanco(texto) {
             const t = texto.toUpperCase();
             if (t.includes("MERCADO PAGO")) return "mercado_pago";
