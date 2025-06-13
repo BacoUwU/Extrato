@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="robots" content="noindex, nofollow">
     <title>Analisador de Extrato Bancário Avançado</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,6 +12,10 @@
         body { font-family: 'Inter', sans-serif; }
         .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .table-container::-webkit-scrollbar { width: 8px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f1f1; }
+        .table-container::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: #555; }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
@@ -21,7 +24,7 @@
 
         <div class="text-center mb-8">
             <h1 class="text-3xl font-bold text-gray-800">📄 Analisador de Extrato Bancário Avançado</h1>
-            <p class="text-gray-600 mt-2">Envie múltiplos extratos, selecione o banco e obtenha relatórios consolidados.</p>
+            <p class="text-gray-600 mt-2">Envie múltiplos extratos e obtenha relatórios consolidados.</p>
         </div>
 
         <!-- Passo 1: Configuração -->
@@ -33,23 +36,23 @@
                     <input type="text" id="userName" placeholder="Ex: JOAO DA SILVA SANTOS" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
-                    <label for="identifiers" class="block text-sm font-medium text-gray-700 mb-1">Outras identificações (CPF, e-mail, etc - separados por vírgula):</label>
+                    <label for="identifiers" class="block text-sm font-medium text-gray-700 mb-1">Outras identificações (CPF, etc - separado por vírgula):</label>
                     <input type="text" id="identifiers" placeholder="000.000.000-00, joao@email.com" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
                     <label for="minValue" class="block text-sm text-gray-700 mb-1">Ignorar valores abaixo de:</label>
-                    <input type="text" id="minValue" placeholder="Ex: 1,00" class="w-full px-4 py-2 border rounded-lg" oninput="formatCurrencyInput(this)">
+                    <input type="text" id="minValue" placeholder="Ex: 1,00" class="w-full px-4 py-2 border rounded-lg">
                 </div>
                 <div>
                     <label for="maxValue" class="block text-sm text-gray-700 mb-1">Ignorar valores acima de:</label>
-                    <input type="text" id="maxValue" placeholder="Ex: 1000,00" class="w-full px-4 py-2 border rounded-lg" oninput="formatCurrencyInput(this)">
+                    <input type="text" id="maxValue" placeholder="Ex: 1000,00" class="w-full px-4 py-2 border rounded-lg">
                 </div>
                 <div class="md:col-span-2">
                     <label for="rendaComprovada" class="block text-sm font-medium text-gray-700">Renda Comprovada (mensal):</label>
-                    <input type="text" id="rendaComprovada" placeholder="Ex: 2.500,00" oninput="formatCurrencyInput(this)" class="w-full border px-4 py-2 rounded-lg">
+                    <input type="text" id="rendaComprovada" placeholder="Ex: 2.500,00" class="w-full border px-4 py-2 rounded-lg">
                 </div>
             </div>
-             <button onclick="salvarIdentificacoes()" class="mt-4 bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition">
+             <button id="save-info-button" class="mt-4 bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition">
                 💾 Salvar Informações no Navegador
             </button>
         </div>
@@ -64,7 +67,7 @@
             <div id="file-list" class="mt-4 space-y-2"></div>
         </div>
         
-        <button id="process-button" onclick="processAllFiles()" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-300 text-lg disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+        <button id="process-button" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-300 text-lg disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
             Processar Extratos
         </button>
         <div id="loading" class="hidden flex items-center justify-center mt-4">
@@ -87,15 +90,15 @@
                 <div class="p-4 bg-gray-50 rounded-lg border">
                     <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
                         <div class="flex items-center gap-2">
-                            <input type="checkbox" id="showSelfTransfers" class="h-4 w-4 rounded text-blue-600 focus:ring-blue-500" onchange="renderDashboard()">
+                            <input type="checkbox" id="showSelfTransfers" class="h-4 w-4 rounded text-blue-600 focus:ring-blue-500">
                             <label for="showSelfTransfers" class="text-sm font-medium text-gray-700 flex items-center gap-1">
                                 Incluir transferências para mim
-                                <span class="cursor-pointer text-xs text-gray-500" title="Essas são transferências entre suas próprias contas. Elas não são consideradas renda, a menos que você marque aqui.">❓</span>
+                                <span class="cursor-pointer text-xs text-gray-500" title="Transferências entre contas do mesmo titular.">❓</span>
                             </label>
                         </div>
                         <div>
                             <label class="text-sm font-medium text-gray-700 mr-2">Filtrar por tipo:</label>
-                            <select id="filterType" onchange="renderDashboard()" class="border border-gray-300 px-2 py-1 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <select id="filterType" class="border border-gray-300 px-2 py-1 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
                                 <option value="todos">Todos</option>
                                 <option value="entrada">Entradas</option>
                                 <option value="saida">Saídas</option>
@@ -104,40 +107,44 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center mb-6" id="dashboardStats"></div>
-                    <div class="overflow-auto border rounded-lg max-h-[400px]" id="dashboardTable"></div>
+                    <div class="overflow-auto border rounded-lg max-h-[400px] table-container">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-100 sticky top-0">
+                                <tr>
+                                    <th class="p-2 text-left">Data</th><th class="p-2 text-left">Banco</th><th class="p-2 text-left">Descrição</th>
+                                    <th class="p-2 text-right">Valor</th><th class="p-2">Tipo</th><th class="p-2">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboardTableBody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             
             <div class="mt-8 text-center">
-                <button onclick="abrirModalManual()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
-                    ➕ Adicionar Manualmente
-                </button>
+                <button id="add-manual-button" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">➕ Adicionar Manualmente</button>
             </div>
 
             <div id="export-buttons" class="mt-8 text-center">
                 <h3 class="text-lg font-bold text-gray-700 mb-4">📤 Exportar Relatórios Consolidados</h3>
                 <div class="flex flex-wrap gap-4 justify-center">
-                    <button onclick="exportAllToXLSX()" class="bg-green-700 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-800 transition-colors">Exportar Planilha (XLSX)</button>
-                    <button onclick="exportToPDF()" class="bg-red-700 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-800 transition-colors">Exportar Relatório (PDF)</button>
+                    <button id="export-xlsx-button" class="bg-green-700 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-800 transition-colors">Exportar Planilha (XLSX)</button>
+                    <button id="export-pdf-button" class="bg-red-700 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-800 transition-colors">Exportar Relatório (PDF)</button>
                 </div>
             </div>
 
             <div class="mt-6 text-center space-x-4">
-                <button onclick="mostrarAprendizados()" class="bg-yellow-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-yellow-600">
-                    ⚙️ Ver/Gerenciar Padrões Aprendidos
-                </button>
-                <button onclick="limparSessao()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300">
-                    🧹 Limpar Atividade Atual
-                </button>
+                <button id="manage-patterns-button" class="bg-yellow-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-yellow-600">⚙️ Ver/Gerenciar Padrões</button>
+                <button id="clear-session-button" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300">🧹 Limpar Sessão</button>
             </div>
         </div>
 
         <!-- Modals -->
         <div id="custom-alert" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-             <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
-                 <p id="alert-message" class="text-gray-800 text-lg mb-4"></p>
-                 <button onclick="closeAlert()" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">OK</button>
-             </div>
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+                <p id="alert-message" class="text-gray-800 text-lg mb-4"></p>
+                <button id="alert-ok-button" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700">OK</button>
+            </div>
         </div>
         
         <div id="classificationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -147,32 +154,32 @@
                 <div class="bg-gray-100 p-4 rounded-lg mb-4 text-center">
                     <p id="transactionDescription" class="font-mono text-gray-800"></p>
                 </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <button onclick="classifyTransaction('entrada')" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">Entrada</button>
-                    <button onclick="classifyTransaction('saida')" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors">Saída</button>
-                    <button onclick="classifyTransaction('self')" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors">Para Mim</button>
-                    <button onclick="classifyTransaction('ignorar')" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors">Ignorar</button>
-                    <button onclick="voltarClassificacao()" class="col-span-2 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors mt-2">🔙 Voltar Última Classificação</button>
+                <div id="classification-buttons" class="grid grid-cols-2 gap-2">
+                    <button data-classify="entrada" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700">Entrada</button>
+                    <button data-classify="saida" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700">Saída</button>
+                    <button data-classify="self" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700">Para Mim</button>
+                    <button data-classify="ignorar" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600">Ignorar</button>
+                    <button id="undo-classification-button" class="col-span-2 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 mt-2">🔙 Voltar Última</button>
                 </div>
             </div>
         </div>
 
         <div id="aprendizadoModal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-            <div class="bg-white p-6 rounded-lg w-full max-w-3xl shadow-lg overflow-y-auto max-h-[80vh]">
+            <div class="bg-white p-6 rounded-lg w-full max-w-3xl shadow-lg flex flex-col max-h-[90vh]">
                 <h2 class="text-xl font-bold text-gray-700 mb-4">📚 Padrões Aprendidos</h2>
-                <div id="listaAprendizadosContainer" class="overflow-auto">
+                <div class="overflow-y-auto flex-grow">
                     <table class="w-full text-sm border">
                         <thead><tr class="bg-gray-100"><th class="text-left p-2">Descrição</th><th class="text-left p-2">Categoria</th><th></th></tr></thead>
                         <tbody id="listaAprendizados"></tbody>
                     </table>
                 </div>
-                <div class="mt-4 flex justify-between items-center gap-4">
+                <div class="mt-4 flex justify-between items-center gap-4 pt-4 border-t">
                     <div>
-                        <button onclick="exportarAprendizados()" class="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 text-sm">⬇️ Exportar JSON</button>
-                        <input type="file" id="importAprendizados" accept=".json" class="hidden" onchange="importarAprendizados(event)">
-                        <button onclick="document.getElementById('importAprendizados').click()" class="bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 text-sm">⬆️ Importar JSON</button>
+                        <button id="export-patterns-button" class="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 text-sm">⬇️ Exportar JSON</button>
+                        <input type="file" id="import-patterns-input" accept=".json" class="hidden">
+                        <button id="import-patterns-button" class="bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 text-sm">⬆️ Importar JSON</button>
                     </div>
-                    <button onclick="fecharAprendizados()" class="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">Fechar</button>
+                    <button id="close-patterns-button" class="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">Fechar</button>
                 </div>
             </div>
         </div>
@@ -182,530 +189,802 @@
             <h3 class="text-lg font-bold mb-4">Adicionar Transação Manual</h3>
             <input type="text" id="manualDate" placeholder="Data (DD/MM/AAAA)" class="w-full border mb-2 px-3 py-2 rounded">
             <input type="text" id="manualDesc" placeholder="Descrição" class="w-full border mb-2 px-3 py-2 rounded">
-            <input type="text" id="manualValor" placeholder="Valor ex: 150,00 (use - para saídas)" class="w-full border mb-2 px-3 py-2 rounded" oninput="formatCurrencyInput(this, true)">
+            <input type="text" id="manualValor" placeholder="Valor ex: 150,00" class="w-full border mb-2 px-3 py-2 rounded">
             <select id="manualTipo" class="w-full border mb-4 px-3 py-2 rounded">
                 <option value="entrada">Entrada</option>
                 <option value="saida">Saída</option>
                 <option value="self">Para Mim</option>
             </select>
             <div class="flex justify-end gap-2">
-                <button onclick="fecharModalManual()" class="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500">Cancelar</button>
-                <button onclick="salvarManual()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Salvar</button>
+                <button id="cancel-manual-button" class="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500">Cancelar</button>
+                <button id="save-manual-button" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Salvar</button>
             </div>
           </div>
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
-        
-        let filesToProcess = [];
-        let income = [], expenses = [], selfTransfers = [];
-        let transacoesFixas = new Set();
-        let currentTransactionToClassify = null, resolveClassificationPromise = null;
-        let previousClassification = null;
-
-        const pdfUpload = document.getElementById('pdfUpload');
-        const fileListDiv = document.getElementById('file-list');
-        const processButton = document.getElementById('process-button');
-        const loadingIndicator = document.getElementById('loading');
-
-        window.onload = function() {
-            const savedUser = localStorage.getItem("userName");
-            const savedIds = localStorage.getItem("userIdentifiers");
-            if (savedUser) document.getElementById('userName').value = savedUser;
-            if (savedIds) document.getElementById('identifiers').value = savedIds;
-            if(savedUser || savedIds) showAlert("Informações de usuário salvas foram carregadas.");
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js" defer></script>
+    
+    <script type="module">
+        // =================================================================================
+        // MÓDULO DE CONFIGURAÇÃO (config.js)
+        // =================================================================================
+        const config = {
+            BANK_OPTIONS: [
+                { value: 'bb', name: 'Banco do Brasil' }, { value: 'bradesco', name: 'Bradesco' },
+                { value: 'caixa', name: 'Caixa' }, { value: 'c6', name: 'C6 Bank' },
+                { value: 'credisis', name: 'CrediSIS' }, { value: 'inter', name: 'Inter' }, 
+                { value: 'itau', name: 'Itaú' }, { value: 'mercado_pago', name: 'Mercado Pago' }, 
+                { value: 'neon', name: 'Neon' }, { value: 'nubank', name: 'Nubank' }, 
+                { value: 'pagbank', name: 'PagBank' }, { value: 'pan', name: 'Banco PAN' }, 
+                { value: 'picpay', name: 'PicPay' }, { value: 'recargapay', name: 'RecargaPay' }, 
+                { value: 'safra', name: 'Safra' }, { value: 'santander', name: 'Santander' }, 
+                { value: 'sicoob', name: 'Sicoob' }, { value: 'sicredi', name: 'Sicredi' }, 
+                { value: 'generico', name: 'Genérico' }
+            ].sort((a, b) => a.name.localeCompare(b.name)),
+            KEYWORDS_ENTRADA: [
+                'ajuste a crédito', 'crédito', 'depósito', 'devolução de compra', 'dinheiro devolvido', 
+                'entrada', 'liberação de dinheiro', 'ordem de pagamento', 'opr liquid', 'pagamento recebido', 
+                'pix de', 'pix recebido', 'proventos', 'recebido de', 'recebimento', 'recebimento de pix', 
+                'receita', 'reembolso', 'remuneração', 'rendimento', 'resgate', 'restituição', 
+                'retorno de operação', 'salário', 'transferência entrada', 'transferência pix recebida', 'transferência recebida', 
+                'transferência via pix recebida', 'transferido de', 'valor recebido', 'venda'
+            ].sort(),
+            KEYWORDS_SAIDA: [
+                'assinatura', 'boleto', 'compra', 'compra cartão', 'compra no débito', 'compra online', 
+                'débito', 'débito agendado', 'débito automático', 'débito em conta', 'doc enviado', 
+                'encargos', 'envio', 'envio de dinheiro', 'fatura', 'imposto', 'iof', 'juros', 
+                'mensalidade', 'pagamento', 'pagamento com código qr pix', 'pagamento de boleto', 
+                'pagamento de fatura', 'pagamento efetuado', 'pagto', 'pix enviado', 'pix para', 
+                'recolhimento', 'resgate de investimento', 'saque', 'saque eletrônico', 'tarifa', 
+                'tarifa bancária', 'ted enviada', 'transf', 'transferência enviada', 
+                'transferência via pix enviada', 'transferido para'
+            ].sort(),
         };
 
-        function detectarBanco(texto) {
-            const t = texto.toUpperCase();
-            if (t.includes("MERCADO PAGO")) return "mercado_pago";
-            if (t.includes("NU PAGAMENTOS") || t.includes("NUBANK")) return "nubank";
-            if (t.includes("ITAÚ UNIBANCO") || t.includes("ITAU")) return "itau";
-            if (t.includes("BRADESCO")) return "bradesco";
-            if (t.includes("CAIXA ECONÔMICA FEDERAL") || t.includes("CAIXA")) return "caixa";
-            if (t.includes("BANCO DO BRASIL")) return "bb";
-            if (t.includes("SANTANDER")) return "santander";
-            if (t.includes("BANCO INTER") || t.includes("INTER S.A")) return "inter";
-            if (t.includes("C6 BANK")) return "c6";
-            if (t.includes("PICPAY")) return "picpay";
-            if (t.includes("RECARGAPAY")) return "recargapay";
-            if (t.includes("PAGBANK") || t.includes("PAGSEGURO")) return "pagbank";
-            if (t.includes("NEON")) return "neon";
-            if (t.includes("BANCO PAN")) return "pan";
-            if (t.includes("SAFRA")) return "safra";
-            if (t.includes("SICREDI")) return "sicredi";
-            if (t.includes("SICOOB")) return "sicoob";
-            return "generico";
-        }
-
-        pdfUpload.addEventListener('change', async (event) => {
-            const newFiles = Array.from(event.target.files);
-            for(const file of newFiles) {
-                if(!filesToProcess.some(f => f.name === file.name)) {
-                    const fileText = await readPdfFile(file).catch(() => '');
-                    const detectedBank = detectarBanco(fileText);
-                    filesToProcess.push({ file, name: file.name, selectedBank: detectedBank, text: fileText, id: `file_${Date.now()}_${Math.random()}` });
-                }
-            }
-            renderFileList();
-            processButton.disabled = filesToProcess.length === 0;
-            event.target.value = '';
-        });
-        
-        function renderFileList() {
-            fileListDiv.innerHTML = '';
-            filesToProcess.forEach((fileWrapper, index) => {
-                const fileElement = document.createElement('div');
-                fileElement.className = 'flex items-center justify-between p-2 bg-gray-100 rounded-lg';
-                const bankOptions = Object.keys(parsers).map(key => `<option value="${key}" ${fileWrapper.selectedBank === key ? 'selected' : ''}>${formatBankName(key)}</option>`).join('');
-                
-                fileElement.innerHTML = `
-                    <span class="text-sm font-medium text-gray-800">${fileWrapper.name}</span>
-                    <div class="flex items-center gap-2">
-                        <select onchange="updateFileBank(${index}, this.value)" class="border border-gray-300 px-2 py-1 rounded-lg text-sm">
-                            ${bankOptions}
-                        </select>
-                        <button onclick="removeFile(${index})" class="text-red-500 hover:text-red-700 font-bold text-lg">&times;</button>
-                    </div>
-                `;
-                fileListDiv.appendChild(fileElement);
-            });
-        }
-        
-        function updateFileBank(index, bank) { filesToProcess[index].selectedBank = bank; }
-        function removeFile(index) { filesToProcess.splice(index, 1); renderFileList(); processButton.disabled = filesToProcess.length === 0; }
-
-        async function processAllFiles() {
-            income = []; expenses = []; selfTransfers = []; transacoesFixas.clear();
-            loadingIndicator.style.display = 'flex';
-            
-            const identifiers = getIdentifiers();
-            if (identifiers.all.length === 0) {
-                loadingIndicator.style.display = 'none';
-                return showAlert('Por favor, insira o nome completo.');
-            }
-            
-            for (const fileWrapper of filesToProcess) {
-                const parser = parsers[fileWrapper.selectedBank] || ((text) => {
-                    console.warn("Banco não reconhecido, usando parser genérico:", fileWrapper.selectedBank, fileWrapper.name);
-                    return parsers.generico(text);
-                });
-                const transacoes = parser(fileWrapper.text);
-                await classifyAndProcessTransactions(transacoes, identifiers.all, fileWrapper.selectedBank);
-            }
-            
-            loadingIndicator.style.display = 'none';
-            renderDashboard();
-        }
-
-        async function readPdfFile(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const pdfData = new Uint8Array(e.target.result);
-                        const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                        let fullText = '';
-                        for (let i = 1; i <= pdf.numPages; i++) {
-                            const page = await pdf.getPage(i);
-                            const textContent = await page.getTextContent();
-                            let lastY = -1, lineBuffer = [];
-                            textContent.items.forEach(item => {
-                                if (lastY !== -1 && Math.abs(item.transform[5] - lastY) > 5) {
-                                    fullText += lineBuffer.join(' ') + '\n';
-                                    lineBuffer = [];
-                                }
-                                lineBuffer.push(item.str);
-                                lastY = item.transform[5];
-                            });
-                            fullText += lineBuffer.join(' ') + '\n';
-                        }
-                        resolve(fullText);
-                    } catch (error) { reject(error); }
+        // =================================================================================
+        // MÓDULO DE ESTADO (state.js)
+        // =================================================================================
+        const state = {
+            appState: {},
+            getInitialState() {
+                return {
+                    filesToProcess: [], income: [], expenses: [], selfTransfers: [],
+                    transacoesFixas: new Set(), lastClassification: null,
+                    classificationPromise: null,
                 };
-                reader.onerror = (error) => reject(error);
-                reader.readAsArrayBuffer(file);
-            });
-        }
+            },
+            init() { this.appState = this.getInitialState(); },
+            getState() { return this.appState; },
+            reset() { this.appState = this.getInitialState(); },
+            addFile(file) { this.appState.filesToProcess.push(file); },
+            removeFile(index) { this.appState.filesToProcess.splice(index, 1); },
+            updateFileBank(index, bank) { this.appState.filesToProcess[index].selectedBank = bank; },
+        };
+        state.init();
 
-        async function classifyAndProcessTransactions(transacoes, allIdentifiers, bankName) {
-            const minValue = parseFloat(document.getElementById("minValue").value.replace(/\./g, '').replace(',', '.')) || 0;
-            const maxValue = parseFloat(document.getElementById("maxValue").value.replace(/\./g, '').replace(',', '.')) || 0;
-            
-            const transacoesFiltradas = transacoes.filter(t => {
-                const absValue = Math.abs(t.value);
-                const minOk = minValue === 0 || absValue >= minValue;
-                const maxOk = maxValue === 0 || absValue <= maxValue;
-                return minOk && maxOk;
-            });
-            
-            const learnedPatterns = loadLearnedPatterns();
-            const keywordsSaida = ['pagamento', 'pix enviado', 'transferência enviada', 'transferência pix enviada', 'compra', 'boleto', 'saque', 'débito', 'envio', 'pix para', 'transferido para', 'tarifa', 'mensalidade'];
-            const keywordsEntrada = ['pix recebido', 'transferência recebida', 'transferência pix recebida', 'depósito', 'entrada', 'crédito', 'salário', 'rendimento', 'recebido de', 'transferido de', 'pix de', 'recebimento'];
-            
-            for (const t of transacoesFiltradas) {
-                t.id = `tx_${Date.now()}_${Math.random()}`; 
-                t.bank = formatBankName(bankName);
-                const descKey = t.description.toLowerCase();
-                let category = learnedPatterns[descKey];
-                
-                if (!category) {
-                    const isSelf = allIdentifiers.some(id => descKey.includes(id));
-                    if (isSelf) {
-                        category = 'self';
-                    } else if (keywordsSaida.some(k => descKey.includes(k))) {
-                        category = 'saida';
-                    } else if (keywordsEntrada.some(k => descKey.includes(k))) {
-                        category = 'entrada';
-                    } else {
-                        category = await askForClassification(t);
-                    }
-                    if (category && category !== 'ignorar') {
-                        learnedPatterns[descKey] = category;
-                        saveLearnedPatterns(learnedPatterns);
-                    }
-                }
-
-                if (category === 'self') selfTransfers.push(t);
-                else if (category === 'entrada') income.push(t);
-                else if (category === 'saida') expenses.push(t);
+        // =================================================================================
+        // MÓDULO DE UTILITÁRIOS (utils.js)
+        // =================================================================================
+        const utils = {
+            formatCurrency(value) { return (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); },
+            parseValue(valueString) {
+                if (typeof valueString !== 'string') valueString = String(valueString);
+                let cleanString = valueString.replace(/R[S$]|\s|\./g, '').replace(/,(\d{2})$/, '.$1');
+                const value = parseFloat(cleanString);
+                return isNaN(value) ? 0 : value;
+            },
+            formatCurrencyInput(input) {
+                let value = input.value.replace(/\D/g, '');
+                if (!value) { input.value = ''; return; }
+                value = (parseInt(value, 10) / 100).toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+                input.value = value;
+            },
+            downloadFile(content, filename, contentType) {
+                const blob = new Blob([content], { type: contentType });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
             }
-        }
-        
-        function renderDashboard() {
-            document.getElementById('results').classList.remove('hidden');
-            document.getElementById('dashboard').classList.remove('hidden');
-            const showSelf = document.getElementById('showSelfTransfers').checked;
-            const tipoFiltro = document.getElementById('filterType').value;
-
-            let transacoesVisiveis = [];
-            if (tipoFiltro === 'todos' || tipoFiltro === 'entrada') transacoesVisiveis.push(...income.map(t => ({...t, tipo: 'entrada'})));
-            if (tipoFiltro === 'todos' || tipoFiltro === 'saida') transacoesVisiveis.push(...expenses.map(t => ({...t, tipo: 'saida'})));
-            
-            if (showSelf || tipoFiltro === 'self') {
-                 const selfIdsInTable = new Set(transacoesVisiveis.map(t => t.id));
-                 const newSelfTransfers = selfTransfers.filter(t => !selfIdsInTable.has(t.id));
-                 transacoesVisiveis.push(...newSelfTransfers.map(t => ({...t, tipo: 'self'})));
-            }
-            
-            let transacoesParaCalculo = [...income, ...expenses];
-            if (showSelf) transacoesParaCalculo.push(...selfTransfers);
-            
-            let totalEntradasCalc = transacoesParaCalculo.filter(t => t.value > 0).reduce((acc, t) => acc + t.value, 0);
-            let totalSaidasCalc = transacoesParaCalculo.filter(t => t.value < 0).reduce((acc, t) => acc + t.value, 0);
-            let saldoCalc = totalEntradasCalc + totalSaidasCalc;
-
-            document.getElementById('dashboardStats').innerHTML = `
-                <div class="bg-green-100 p-4 rounded-lg"><p class="text-green-700 font-semibold">Entradas</p><p class="text-2xl font-bold">${formatCurrency(totalEntradasCalc)}</p></div>
-                <div class="bg-red-100 p-4 rounded-lg"><p class="text-red-700 font-semibold">Saídas</p><p class="text-2xl font-bold">${formatCurrency(totalSaidasCalc)}</p></div>
-                <div class="bg-blue-100 p-4 rounded-lg"><p class="text-blue-700 font-semibold">Saldo</p><p class="text-2xl font-bold">${formatCurrency(saldoCalc)}</p></div>`;
-
-            let table = `<table class="min-w-full text-sm"><thead class="bg-gray-100">
-                <tr><th class="p-2 text-left">Data</th><th class="p-2 text-left">Banco</th><th class="p-2 text-left">Descrição</th><th class="p-2 text-right">Valor</th><th class="p-2">Tipo</th><th class="p-2">Ações</th></tr></thead><tbody>`;
-            transacoesVisiveis.forEach((t) => {
-                const tipoNome = t.tipo === 'entrada' ? 'Entrada' : t.tipo === 'saida' ? 'Saída' : 'Para Mim';
-                const cor = t.tipo === 'entrada' ? 'text-green-600' : t.tipo === 'saida' ? 'text-red-600' : 'text-gray-500';
-                const fixoIcon = transacoesFixas.has(t.id) ? '⭐ ' : '';
-                table += `<tr class="border-t"><td class="p-2">${t.date}</td><td class="p-2">${t.bank}</td><td class="p-2">${fixoIcon}${t.description}</td>
-                    <td class="p-2 text-right ${cor} font-semibold">${formatCurrency(t.value)}</td>
-                    <td class="p-2 text-center capitalize">${tipoNome}</td>
-                    <td class="p-2 text-center">
-                        <button onclick="toggleFixo('${t.id}')" class="text-indigo-600 hover:underline text-xs mr-2">Fixo</button>
-                        <button onclick="removerTransacao('${t.id}')" class="text-red-600 hover:underline text-xs">Remover</button>
-                    </td></tr>`;
-            });
-            table += '</tbody></table>';
-            document.getElementById('dashboardTable').innerHTML = table;
-            
-            renderCreditAnalysis();
-        }
-        
-        function removerTransacao(id) {
-            income = income.filter(t => t.id !== id);
-            expenses = expenses.filter(t => t.id !== id);
-            selfTransfers = selfTransfers.filter(t => t.id !== id);
-            transacoesFixas.delete(id);
-            renderDashboard();
-        }
-        
-        function limparSessao() {
-            income = []; expenses = []; selfTransfers = [];
-            filesToProcess = []; transacoesFixas.clear();
-            document.getElementById('file-list').innerHTML = '';
-            document.getElementById('results').classList.add('hidden');
-            processButton.disabled = true;
-            showAlert("Atividade atual foi limpa. Dados salvos no navegador foram mantidos.");
-        }
-
-        function abrirModalManual() { document.getElementById('modalManual').classList.remove('hidden'); }
-        function fecharModalManual() { document.getElementById('modalManual').classList.add('hidden'); }
-        function salvarManual() {
-            const date = document.getElementById("manualDate").value;
-            const desc = document.getElementById("manualDesc").value;
-            let rawVal = document.getElementById("manualValor").value;
-            const tipo = document.getElementById("manualTipo").value;
-            const isNegative = rawVal.startsWith('-');
-            rawVal = rawVal.replace(/\D/g, ''); 
-            let val = parseValue(rawVal);
-            if(isNegative) val = -Math.abs(val);
-            if (!date || !desc || isNaN(val)) { showAlert("Preencha corretamente todos os campos."); return; }
-            const t = { id: `manual_${Date.now()}`, date, description: desc, value: val, bank: "Manual" };
-            if (tipo === 'entrada') { if (t.value < 0) t.value = -t.value; income.push(t); }
-            else if (tipo === 'saida') { if (t.value > 0) t.value = -t.value; expenses.push(t); }
-            else selfTransfers.push(t);
-            fecharModalManual();
-            renderDashboard();
-        }
-        
-        function toggleFixo(id) {
-            if (transacoesFixas.has(id)) transacoesFixas.delete(id);
-            else transacoesFixas.add(id);
-            renderDashboard(); 
-        }
-
-        function renderCreditAnalysis() {
-            const metrics = calculateCreditMetrics();
-            document.getElementById('credit-analysis-panel').classList.remove('hidden');
-            document.getElementById('credit-summary').innerHTML = `
-                <div><p class="font-semibold text-indigo-700">Renda Líquida Estimada</p><p class="text-2xl font-bold">${formatCurrency(metrics.rendaLiquida)}</p></div>
-                <div><p class="font-semibold text-indigo-700">Comprometimento de Renda</p><p class="text-2xl font-bold">${metrics.comprometimento}</p></div>`;
-        }
-
-        function calculateCreditMetrics() {
-            const showSelf = document.getElementById('showSelfTransfers').checked;
-            let transacoesParaCalculo = [...income, ...expenses];
-            if (showSelf) transacoesParaCalculo = transacoesParaCalculo.concat(selfTransfers);
-
-            const totalEntradas = transacoesParaCalculo.filter(t => t.value > 0).reduce((s, t) => s + t.value, 0);
-            const totalSaidas = transacoesParaCalculo.filter(t => t.value < 0).reduce((s, t) => s + t.value, 0); 
-            const comprometimento = (totalEntradas > 0) ? (Math.abs(totalSaidas) / totalEntradas) : 0;
-            return {
-                rendaLiquida: totalEntradas,
-                comprometimento: (comprometimento * 100).toFixed(1) + '%'
-            };
-        }
-        
-        function calculateCreditScore(metrics) {
-            const renda = metrics.rendaLiquida;
-            const comp = parseFloat(metrics.comprometimento);
-            if (renda >= 3000 && comp < 30) return { score: 850, risco: "Muito Baixo" };
-            if (renda >= 2000 && comp < 40) return { score: 750, risco: "Baixo" };
-            if (renda >= 1500 && comp < 50) return { score: 650, risco: "Médio" };
-            return { score: 550, risco: "Alto" };
-        }
-        
-        function generateMonthlyHistory() {
-            const resumo = {};
-            const allTransactions = [...income, ...expenses];
-            for (const t of allTransactions) {
-                try {
-                    const dateParts = t.date.split('/');
-                    if (dateParts.length < 2) continue;
-                    let day = dateParts[0], month = dateParts[1], year = dateParts[2];
-                    if (!year) year = new Date().getFullYear().toString();
-                    if (year.length === 2) year = '20' + year;
-                    const mesAno = `${month.padStart(2, '0')}/${year}`;
-                    if (!resumo[mesAno]) resumo[mesAno] = { entradas: 0, saidas: 0 };
-                    if (t.value > 0) resumo[mesAno].entradas += t.value;
-                    else resumo[mesAno].saidas += t.value;
-                } catch(e) { console.warn("Could not parse date for monthly history:", t.date); }
-            }
-            return Object.entries(resumo).map(([mes, dados]) => ({
-                Mês: mes, Entradas: dados.entradas, Saídas: dados.saidas, Saldo: dados.entradas + dados.saidas
-            }));
-        }
-
-        function getIdentifiers() {
-             const u = document.getElementById('userName').value.trim().toLowerCase();
-             const iR = document.getElementById('identifiers').value.trim().toLowerCase();
-             const aI = iR.split(',').map(i => i.trim()).filter(Boolean);
-             return { raw: document.getElementById('identifiers').value.trim(), all: [u, ...aI].filter(Boolean) };
-        }
-        function salvarIdentificacoes() { localStorage.setItem("userName", document.getElementById("userName").value.trim()); localStorage.setItem("userIdentifiers", document.getElementById("identifiers").value.trim()); showAlert("Identificações salvas com sucesso."); }
-        function loadLearnedPatterns() { return JSON.parse(localStorage.getItem("aprendizadoTransacoes") || "{}"); }
-        function saveLearnedPatterns(data) { localStorage.setItem("aprendizadoTransacoes", JSON.stringify(data)); }
-        
-        function askForClassification(transaction) {
-            return new Promise(resolve => {
-                if (!previousClassification || previousClassification.transaction.id !== transaction.id) {
-                     previousClassification = { transaction, resolve };
-                }
-                currentTransactionToClassify = transaction;
-                resolveClassificationPromise = resolve;
-                document.getElementById('transactionDescription').textContent = transaction.description;
-                document.getElementById('classificationModal').classList.remove('hidden');
-            });
-        }
-        
-        function classifyTransaction(category) {
-            document.getElementById('classificationModal').classList.add('hidden');
-            if (resolveClassificationPromise) {
-                if(category !== 'ignorar') {
-                    previousClassification = {
-                        transaction: currentTransactionToClassify,
-                        resolve: resolveClassificationPromise,
-                        category: category,
-                    };
-                }
-                resolveClassificationPromise(category);
-                resolveClassificationPromise = null;
-            }
-        }
-
-        function voltarClassificacao() {
-            if (previousClassification && previousClassification.resolve) {
-                const lastTransaction = previousClassification.transaction;
-                
-                if (previousClassification.category === 'entrada') income = income.filter(t => t.id !== lastTransaction.id);
-                else if (previousClassification.category === 'saida') expenses = expenses.filter(t => t.id !== lastTransaction.id);
-                else if (previousClassification.category === 'self') selfTransfers = selfTransfers.filter(t => t.id !== lastTransaction.id);
-
-                const learned = loadLearnedPatterns();
-                delete learned[lastTransaction.description.toLowerCase()];
-                saveLearnedPatterns(learned);
-                
-                document.getElementById('classificationModal').classList.add('hidden');
-                
-                askForClassification(lastTransaction).then(newCategory => {
-                    if (newCategory && newCategory !== 'ignorar') {
-                        const patterns = loadLearnedPatterns();
-                        patterns[lastTransaction.description.toLowerCase()] = newCategory;
-                        saveLearnedPatterns(patterns);
-                        
-                        if (newCategory === 'self') selfTransfers.push(lastTransaction);
-                        else if (newCategory === 'entrada') income.push(lastTransaction);
-                        else if (newCategory === 'saida') expenses.push(lastTransaction);
-                    }
-                    renderDashboard();
-                });
-
-                 previousClassification = null;
-            } else {
-                showAlert("Nenhuma classificação anterior para voltar.");
-            }
-        }
-        
-        function mostrarAprendizados() { const d = loadLearnedPatterns(); const t = document.getElementById("listaAprendizados"); t.innerHTML = ""; Object.entries(d).forEach(([desc, tipo]) => { const r = document.createElement("tr"); r.innerHTML = `<td class="p-2 border-b">${desc}</td><td class="p-2 border-b capitalize">${tipo}</td><td class="p-2 border-b text-right"><button onclick="removerAprendizado('${desc}')" class="text-red-600 hover:underline text-sm">Remover</button></td>`; t.appendChild(r); }); document.getElementById("aprendizadoModal").classList.remove("hidden"); }
-        function fecharAprendizados() { document.getElementById("aprendizadoModal").classList.add("hidden"); }
-        function removerAprendizado(desc) { const d = loadLearnedPatterns(); delete d[desc]; saveLearnedPatterns(d); mostrarAprendizados(); }
-        const parseValue = (str) => { if (typeof str !== 'string') str = String(str); return parseFloat(str.replace(/[^\d,-]/g, '').replace(/\./g, '').replace(',', '.')); };
-        function formatBankName(key) { return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); }
-        function formatCurrencyInput(input, allowNegative = false) { let value = input.value; const isNegative = allowNegative && value.startsWith('-'); if(isNegative) value = value.substring(1); value = value.replace(/\D/g, ''); if (!value) { input.value = ''; return; } value = (parseInt(value, 10) || 0).toString(); if (value.length < 3) value = value.padStart(3, '0'); let result = value.slice(0, -2) + ',' + value.slice(-2); if (isNegative) result = '-' + result; input.value = result; }
-        function formatCurrency(value) { return (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-        function showAlert(message) { document.getElementById('alert-message').textContent = message; document.getElementById('custom-alert').classList.remove('hidden'); }
-        function closeAlert() { document.getElementById('custom-alert').classList.add('hidden'); }
-        function downloadFile(content, filename, contentType) { const blob = new Blob([content], { type: contentType }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.setAttribute('download', filename); document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); }
-        
-        const parsers = {
-            mercado_pago: (texto) => { const transacoes = []; const regex = /^(\d{2}-\d{2}-\d{4})\s+(.+?)\s+\d+\s+R\$\s+(-?[\d.,]+)/; texto.split('\n').forEach(l => { const m = l.match(regex); if(m) { let [_, d, desc, vS] = m; d = d.replace(/-/g, '/'); const v = parseValue(vS); if(!isNaN(v)) transacoes.push({date:d, description:desc.trim(), value:v}); } }); return transacoes; },
-            nubank: (texto) => { const transacoes = []; const regex = /(\d{2}\s[A-Z]{3})\s+(.+?)\s+(-?[\d,.]+)/i; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if(!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            itau: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+(-?[\d.,]+,\d{2})[ C]?$/; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            bradesco: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+)\s(\d{1,3}(?:\.\d{3})*,\d{2})(\s+C|\s+D)?$/; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { let [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if(tipo && tipo.trim() === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            caixa: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+\d+\s+(.+?)\s+([\d.,]+)\s+[DC]/; texto.split('\n').forEach(l => { const m = l.match(regex); if(m){ let [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if(l.endsWith('D')) v = -v; if(!isNaN(v)) transacoes.push({date:d, description:desc.trim(), value:v}); } }); return transacoes; },
-            bb: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+(-?[\d.,]+,\d{2})/; texto.split('\n').forEach(l => { const m = l.match(regex); if(m) { const[_,d,desc,vS]=m; const v = parseValue(vS); if(!isNaN(v)) transacoes.push({date:d,description:desc.trim(),value:v}); } }); return transacoes; },
-            inter: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+(-?[\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            santander: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.{5,50})\s+(-?[\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            c6: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+([\d.,]+)\s+([DC])$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if (tipo === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            picpay: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+-?R?\$\s?([\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            recargapay: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+-?R?\$\s?([\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            pagbank: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+R?\$\s?([\d.,]+)\s+([CD])$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if (tipo === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            neon: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+-?R?\$\s?([\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            pan: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+([\d.,]+)\s+([DC])$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if (tipo === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            safra: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.{5,40})\s+(-?[\d.,]+)$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS] = m; const v = parseValue(vS); if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            sicredi: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.{3,50})\s+([\d.,]+)\s+([CD])$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if (tipo === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            sicoob: (texto) => { const transacoes = []; const regex = /^(\d{2}\/\d{2})\s+(.{3,40})\s+([\d.,]+)\s+([CD])$/gm; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const [_, d, desc, vS, tipo] = m; let v = parseValue(vS); if (tipo === 'D') v = -v; if (!isNaN(v)) transacoes.push({ date: d, description: desc.trim(), value: v }); } }); return transacoes; },
-            generico: (texto) => { const transacoes = []; const regex = /(\d{2}\/\d{2}(\/\d{2,4})?)\s+(.+?)\s+(-?R?\$\s?)?(-?[\d.,]+,\d{2})/; texto.split('\n').forEach(l => { const m = l.match(regex); if (m) { const date = m[1]; let desc = m[3]; const val = parseValue(m[5]); if (!isNaN(val)) transacoes.push({date, description:desc.trim(), value:val}); } }); return transacoes; }
         };
 
-        function exportAllToXLSX() {
-            if (income.length === 0 && expenses.length === 0) return showAlert("Não há dados para exportar.");
-            const wb = XLSX.utils.book_new();
-            
-            const showSelf = document.getElementById('showSelfTransfers').checked;
-            const selfData = showSelf ? selfTransfers.map(t => ({ Data: t.date, Banco: t.bank, Descrição: t.description, Valor: t.value })) : [];
+        // =================================================================================
+        // MÓDULO DOM (dom.js)
+        // =================================================================================
+        const dom = {
+            elements: {
+                processButton: document.getElementById('process-button'), loadingIndicator: document.getElementById('loading'),
+                resultsSection: document.getElementById('results'), fileList: document.getElementById('file-list'),
+                dashboardSection: document.getElementById('dashboard'), creditPanel: document.getElementById('credit-analysis-panel'),
+                creditSummary: document.getElementById('credit-summary'), dashboardStats: document.getElementById('dashboardStats'),
+                dashboardTableBody: document.getElementById('dashboardTableBody'), alertModal: document.getElementById('custom-alert'),
+                alertMessage: document.getElementById('alert-message'), classificationModal: document.getElementById('classificationModal'),
+                transactionDescription: document.getElementById('transactionDescription'), aprendizadoModal: document.getElementById('aprendizadoModal'),
+                listaAprendizados: document.getElementById('listaAprendizados'), manualModal: document.getElementById('modalManual'),
+                showSelfTransfers: document.getElementById('showSelfTransfers'), filterType: document.getElementById('filterType'),
+                importPatternsInput: document.getElementById('import-patterns-input'),
+            },
+            showAlert(message) {
+                this.elements.alertMessage.textContent = message;
+                this.elements.alertModal.classList.remove('hidden');
+            },
+            closeAlert() { this.elements.alertModal.classList.add('hidden'); },
+            showModal(modal) { modal.classList.remove('hidden'); },
+            hideModal(modal) { modal.classList.add('hidden'); },
+            toggleLoading(show) { this.elements.loadingIndicator.style.display = show ? 'flex' : 'none'; },
+            renderFileList(files) {
+                this.elements.fileList.innerHTML = '';
+                files.forEach((fileWrapper, index) => {
+                    const fileElement = document.createElement('div');
+                    fileElement.className = 'flex items-center justify-between p-2 bg-gray-100 rounded-lg';
+                    const bankOptions = config.BANK_OPTIONS.map(bank => `<option value="${bank.value}" ${fileWrapper.selectedBank === bank.value ? 'selected' : ''}>${bank.name}</option>`).join('');
+                    fileElement.innerHTML = `
+                        <span class="text-sm font-medium text-gray-800">${fileWrapper.name}</span>
+                        <div class="flex items-center gap-2">
+                            <select data-index="${index}" class="bank-select border border-gray-300 px-2 py-1 rounded-lg text-sm">${bankOptions}</select>
+                            <button data-index="${index}" class="remove-file-button text-red-500 hover:text-red-700 font-bold text-lg">&times;</button>
+                        </div>`;
+                    this.elements.fileList.appendChild(fileElement);
+                });
+            },
+            renderDashboard(visibleTransactions, stats) {
+                this.elements.resultsSection.classList.remove('hidden');
+                this.elements.dashboardSection.classList.remove('hidden');
+                this.elements.creditPanel.classList.remove('hidden');
+                this.elements.dashboardStats.innerHTML = `
+                    <div class="bg-green-100 p-4 rounded-lg"><p class="text-green-700 font-semibold">Entradas</p><p class="text-2xl font-bold">${utils.formatCurrency(stats.totalEntradas)}</p></div>
+                    <div class="bg-red-100 p-4 rounded-lg"><p class="text-red-700 font-semibold">Saídas</p><p class="text-2xl font-bold">${utils.formatCurrency(stats.totalSaidas)}</p></div>
+                    <div class="bg-blue-100 p-4 rounded-lg"><p class="text-blue-700 font-semibold">Saldo</p><p class="text-2xl font-bold">${utils.formatCurrency(stats.saldo)}</p></div>`;
+                this.elements.dashboardTableBody.innerHTML = '';
+                const fragment = document.createDocumentFragment();
+                const appState = state.getState();
+                visibleTransactions.forEach((t) => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-t hover:bg-gray-50';
+                    const tipoNome = t.tipo === 'entrada' ? 'Entrada' : t.tipo === 'saida' ? 'Saída' : 'Para Mim';
+                    const cor = t.tipo === 'entrada' ? 'text-green-600' : t.tipo === 'saida' ? 'text-red-600' : 'text-gray-500';
+                    const fixoIcon = appState.transacoesFixas.has(t.id) ? '⭐ ' : '';
+                    tr.innerHTML = `
+                        <td class="p-2">${t.date}</td><td class="p-2">${t.bank}</td><td class="p-2">${fixoIcon}${t.description}</td>
+                        <td class="p-2 text-right ${cor} font-semibold">${utils.formatCurrency(t.value)}</td>
+                        <td class="p-2 text-center capitalize">${tipoNome}</td>
+                        <td class="p-2 text-center">
+                            <button data-id="${t.id}" class="toggle-fixo-button text-indigo-600 hover:underline text-xs mr-2">Fixo</button>
+                            <button data-id="${t.id}" class="remove-tx-button text-red-600 hover:underline text-xs">Remover</button>
+                        </td>`;
+                    fragment.appendChild(tr);
+                });
+                this.elements.dashboardTableBody.appendChild(fragment);
+            },
+            renderCreditAnalysis(metrics) {
+                this.elements.creditSummary.innerHTML = `
+                    <div><p class="font-semibold text-indigo-700">Renda Líquida Estimada</p><p class="text-2xl font-bold">${utils.formatCurrency(metrics.rendaLiquida)}</p></div>
+                    <div><p class="font-semibold text-indigo-700">Comprometimento de Renda</p><p class="text-2xl font-bold">${metrics.comprometimento}</p></div>`;
+            },
+            renderLearnedPatterns(patterns) {
+                this.elements.listaAprendizados.innerHTML = '';
+                Object.entries(patterns).forEach(([desc, tipo]) => {
+                    const r = document.createElement("tr");
+                    r.innerHTML = `<td class="p-2 border-b">${desc}</td><td class="p-2 border-b capitalize">${tipo}</td><td class="p-2 border-b text-right"><button data-desc="${desc}" class="remove-pattern-button text-red-600 hover:underline text-sm">Remover</button></td>`;
+                    this.elements.listaAprendizados.appendChild(r);
+                });
+            },
+        };
 
-            const incomeData = income.map(t => ({ Data: t.date, Banco: t.bank, Descrição: t.description, Valor: t.value }));
-            const expenseData = expenses.map(t => ({ Data: t.date, Banco: t.bank, Descrição: t.description, Valor: t.value }));
-            const historicoData = generateMonthlyHistory();
-            const creditMetrics = calculateCreditMetrics();
-            const creditScore = calculateCreditScore(creditMetrics);
-            const scoreData = [{
-                'Renda Comprovada': formatCurrency(parseValue(document.getElementById('rendaComprovada').value || '0')),
-                'Renda Líquida Estimada': formatCurrency(creditMetrics.rendaLiquida),
-                'Comprometimento de Renda': creditMetrics.comprometimento,
-                'Score Estimado': creditScore.score,
-                'Risco Sugerido': creditScore.risco
-            }];
+        // =================================================================================
+        // MÓDULO DE PARSERS (parsers.js)
+        // =================================================================================
+        const parsers = {
+            detectBank(text) {
+                const t = text.toUpperCase();
+                if (/\bBRADESCO\b/.test(t)) return "bradesco";
+                if (/\b(BANCO\s*DO\s*BRASIL)\b/.test(t)) return "bb";
+                if (/\bCREDISIS\b/.test(t)) return "credisis";
+                if (/\b(MERCADO\s*PAGO)\b/.test(t)) return "mercado_pago";
+                if (/\b(NU\s*PAGAMENTOS|NUBANK)\b/.test(t)) return "nubank";
+                if (/\b(ITAÚ|ITAU\s*UNIBANCO)\b/.test(t)) return "itau";
+                if (/\b(CAIXA\s*ECONÔMICA\s*FEDERAL|CAIXA)\b/.test(t)) return "caixa";
+                if (/\bSANTANDER\b/.test(t)) return "santander";
+                if (/\b(BANCO\s*INTER|INTER\s*S\.\s*A)\b/.test(t)) return "inter";
+                if (/\b(C6\s*BANK)\b/.test(t)) return "c6";
+                if (/\bPICPAY\b/.test(t)) return "picpay";
+                if (/\bRECARGAPAY\b/.test(t)) return "recargapay";
+                if (/\b(PAGBANK|PAGSEGURO)\b/.test(t)) return "pagbank";
+                if (/\bNEON\b/.test(t)) return "neon";
+                if (/\b(BANCO\s*PAN)\b/.test(t)) return "pan";
+                if (/\bSAFRA\b/.test(t)) return "safra";
+                if (/\bSICREDI\b/.test(t)) return "sicredi";
+                if (/\bSICOOB\b/.test(t)) return "sicoob";
+                return "generico";
+            },
+            findYearInText(text) {
+                const monthYearMatch = text.match(/(\b(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+(\d{4})\b)/i);
+                if (monthYearMatch && monthYearMatch[3]) return monthYearMatch[3];
+                const yearMatch = text.match(/\b(20\d{2})\b/);
+                return yearMatch ? yearMatch[0] : new Date().getFullYear().toString();
+            },
+            genericParser(text, year) {
+                const transactions = [];
+                const regex = /(\d{2}\/\d{2}(?:\/\d{2,4})?)\s+(.+?)\s+(?:-?R?\$\s?)?(-?(?:\d{1,3}(?:\.\d{3})*,\d{2}))/gm;
+                for (const match of text.matchAll(regex)) {
+                    let [_, date, desc, valueStr] = match;
+                    if (date.length === 5) date = `${date}/${year}`;
+                    const value = utils.parseValue(valueStr);
+                    if (!isNaN(value)) transactions.push({ date, description: desc.trim(), value });
+                }
+                return transactions;
+            },
+            bankParsers: {
+                 bradesco: (text, year) => {
+                    const transactions = [];
+                    const lines = text.split('\n').map(l => l.trim().replace(/"/g, '')).filter(Boolean);
+                    const regex = /^(\d{2}\/\d{2})\s+(.+?)\s+(\d{6,})\s+([\d.,]+)?\s+(-?[\d.,]+)?\s+(-?[\d.,]+)/;
 
-            const ws_entradas = XLSX.utils.json_to_sheet(incomeData);
-            const ws_saidas = XLSX.utils.json_to_sheet(expenseData);
-            if (showSelf && selfData.length > 0) {
-                const ws_self = XLSX.utils.json_to_sheet(selfData);
-                XLSX.utils.book_append_sheet(wb, ws_self, "Para Mim");
-            }
-            const ws_historico = XLSX.utils.json_to_sheet(historicoData);
-            const ws_score = XLSX.utils.json_to_sheet(scoreData);
+                    for(let i = 0; i < lines.length; i++) {
+                        let line = lines[i];
+                        if (line.toUpperCase().includes('SALDO ANTERIOR')) continue;
 
-            XLSX.utils.book_append_sheet(wb, ws_entradas, "Entradas");
-            XLSX.utils.book_append_sheet(wb, ws_saidas, "Saídas");
-            XLSX.utils.book_append_sheet(wb, ws_historico, "Histórico Mensal");
-            XLSX.utils.book_append_sheet(wb, ws_score, "Score de Crédito");
+                        // Junta linhas de continuação
+                        let j = i + 1;
+                        while(j < lines.length && !/^\d{2}\/\d{2}/.test(lines[j])) {
+                            line += ' ' + lines[j].trim();
+                            j++;
+                        }
+                        i = j - 1;
 
-            XLSX.writeFile(wb, `Relatorio_Financeiro_${new Date().toISOString().slice(0,10)}.xlsx`);
-        }
-        function exportToPDF() {
-            if (income.length === 0 && expenses.length === 0) return showAlert("Não há dados para exportar.");
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
-            doc.setFontSize(18);
-            doc.text("Relatório Financeiro e de Crédito", 14, 22);
-            doc.setFontSize(11);
-            doc.setTextColor(100);
-            
-            const creditMetrics = calculateCreditMetrics();
-            const creditScore = calculateCreditScore(creditMetrics);
-            const rendaComprovada = parseValue(document.getElementById('rendaComprovada').value || '0');
-            const alertaSobreGastos = creditMetrics.rendaLiquida < Math.abs(expenses.reduce((s, t) => s + t.value, 0)) ? "⚠️ Gasto maior que a renda (ponto de atenção)" : "";
+                        const creditMatch = line.match(/([\d.,]+)\s+([\d.,]+)$/);
+                        const debitMatch = line.match(/([\d.,]+)\s+([\d.,]+)\s*$/);
+                        
+                        let date, description, value;
+                        const dateMatch = line.match(/^(\d{2}\/\d{2})/);
+                        if (!dateMatch) continue;
+                        date = `${dateMatch[1]}/${year}`;
 
-            doc.setFontSize(12);
-            doc.text("Resumo de Crédito", 14, 32);
-            doc.setFontSize(10);
-            doc.text(`Renda Comprovada: ${formatCurrency(rendaComprovada)}`, 14, 40);
-            doc.text(`Renda Líquida Estimada: ${formatCurrency(creditMetrics.rendaLiquida)}`, 14, 46);
-            doc.text(`Comprometimento de Renda: ${creditMetrics.comprometimento}`, 14, 52);
-            doc.text(`Score Estimado: ${creditScore.score} - Risco: ${creditScore.risco}`, 14, 58);
-            if(alertaSobreGastos) { doc.setTextColor(255, 0, 0); doc.text(alertaSobreGastos, 14, 64); doc.setTextColor(100); }
+                        if (line.match(/([\d.,]+)\s+([\d.,]+)$/)) { // Formato com crédito e saldo
+                            const parts = line.split(/\s{2,}/);
+                            if (parts.length >= 3) {
+                                description = parts.slice(1, -2).join(' ');
+                                const creditStr = parts[parts.length - 2];
+                                value = utils.parseValue(creditStr);
+                            }
+                        } else if (line.match(/([\d.,]+)\s+([\d.,]+)\s*$/)) { // Formato com débito e saldo
+                             const parts = line.split(/\s{2,}/);
+                             if (parts.length >= 4) {
+                                description = parts.slice(1, -3).join(' ');
+                                const debitStr = parts[parts.length - 2];
+                                value = -Math.abs(utils.parseValue(debitStr));
+                             }
+                        }
+                        
+                        const mainDescMatch = line.match(/^\d{2}\/\d{2}\s+(.+?)\s+\d{6,}/);
+                        if(mainDescMatch) description = mainDescMatch[1].trim();
 
+                        if (description && value !== undefined) {
+                            transactions.push({ date, description, value });
+                        }
+                    }
+                    return transactions;
+                },
+                bb: (text, year) => {
+                    const transactions = [];
+                    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+                    const transactionRegex = /^(\d{2}\/\d{2}\/\d{4})\s+(.+)/;
 
-            const head = [['Data', 'Banco', 'Descrição', 'Valor']];
-            let startY = 75;
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i];
+                        if (line.includes('Saldo Anterior')) continue;
 
-            if (income.length > 0) {
-                doc.autoTable({ startY, head, body: income.map(t => [t.date, t.bank, t.description, formatCurrency(t.value)]), headStyles: { fillColor: [22, 160, 133] }, didDrawPage: (data) => { doc.setFontSize(14); doc.text("Entradas", 14, data.cursor.y - 10); } });
-                startY = doc.autoTable.previous.finalY + 10;
-            }
-            if (expenses.length > 0) {
-                doc.autoTable({ startY, head, body: expenses.map(t => [t.date, t.bank, t.description, formatCurrency(t.value)]), headStyles: { fillColor: [192, 57, 43] }, didDrawPage: (data) => { doc.setFontSize(14); doc.text("Saídas", 14, data.cursor.y - 10); } });
-                startY = doc.autoTable.previous.finalY + 10;
-            }
-            const showSelf = document.getElementById('showSelfTransfers').checked;
-            if (showSelf && selfTransfers.length > 0) {
-                doc.autoTable({ startY, head, body: selfTransfers.map(t => [t.date, t.bank, t.description, formatCurrency(t.value)]), headStyles: { fillColor: [149, 165, 166] }, didDrawPage: (data) => { doc.setFontSize(14); doc.text("Transferências Para Mim", 14, data.cursor.y - 10); } });
-            }
+                        const match = line.match(transactionRegex);
+                        if (match) {
+                            let [_, date, restOfLine] = match;
+                            let description = restOfLine;
+                            
+                            let j = i + 1;
+                            while(j < lines.length && !/^\d{2}\/\d{2}\/\d{4}/.test(lines[j])) {
+                                description += ' ' + lines[j].trim();
+                                j++;
+                            }
+                            i = j - 1;
 
-            doc.save(`Relatorio_Financeiro_${new Date().toISOString().slice(0,10)}.pdf`);
-        }
+                            const valueMatch = description.match(/([\d.,]+)\s*\(([+-])\)$/);
+                            if (valueMatch) {
+                                let value = utils.parseValue(valueMatch[1]);
+                                const sign = valueMatch[2];
+                                if (sign === '-') {
+                                    value = -Math.abs(value);
+                                }
+                                description = description.replace(valueMatch[0], '').trim();
+                                transactions.push({ date, description, value });
+                            }
+                        }
+                    }
+                    return transactions;
+                },
+                credisis: (text, year) => {
+                    const transactions = [];
+                    const lines = text.split('\n').map(l => l.trim().replace(/"/g, '')).filter(Boolean);
+                    const transactionRegex = /^(\d{2}\/\d{2}\/\d{4})\s+([a-zA-Z0-9]+)\s+(.+?)\s+(R[S$]?-?[\d.,]+)/;
+                    
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i];
+                        if (line.toUpperCase().includes('SALDO ANTERIOR')) continue;
+                        const match = line.match(transactionRegex);
+                        if (match) {
+                            let [_, date, code, description, valueStr] = match;
+                            let value = utils.parseValue(valueStr);
+
+                            let j = i + 1;
+                            while (j < lines.length && !/^\d{2}\/\d{2}\/\d{4}/.test(lines[j])) {
+                                description += ' ' + lines[j];
+                                j++;
+                            }
+                            i = j - 1;
+
+                            transactions.push({ date, description: description.trim(), value });
+                        }
+                    }
+                    return transactions;
+                },
+                itau: (text, year) => {
+                    const transactions = [];
+                    const lines = text.split('\n');
+                    const regex = /^(\d{2}\/\d{2}\/\d{4})\s+(?!SALDO DO DIA)(.+?)\s+(-?[\d.,]+),?$/;
+                    for(const line of lines) {
+                        const cleanedLine = line.replace(/"/g, '');
+                        if (cleanedLine.toUpperCase().includes('SALDO DO DIA')) continue;
+                        const match = cleanedLine.match(regex);
+                        if (match) {
+                            const [_, date, description, valueStr] = match;
+                            const value = utils.parseValue(valueStr);
+                            transactions.push({ date, description: description.trim(), value });
+                        }
+                    }
+                    return transactions;
+                },
+                mercado_pago: (text, year) => {
+                    const transactions = [];
+                    const cleanText = text.replace(/"/g, '');
+                    const lines = cleanText.split('\n');
+                    const summaryRegex = /^(Saldo inicial|Entradas|Saidas|Saldas|Saldo final):/;
+                    const transactionRegex = /^(\d{2}-\d{2}-\d{4})\s+(.+?)\s+\d+\s+R\$\s+(-?[\d.,]+)/;
+                    const continuationRegex = /^\s*([A-Z\s]+)\s*$/;
+                    let lastTransaction = null;
+                    for (const line of lines) {
+                        if (summaryRegex.test(line) || line.trim() === '') {
+                             if(lastTransaction) { transactions.push(lastTransaction); lastTransaction = null; }
+                            continue;
+                        }
+                        const match = line.match(transactionRegex);
+                        if (match) {
+                             if(lastTransaction) { transactions.push(lastTransaction); }
+                            let [_, date, desc, valueStr] = match;
+                            date = date.replace(/-/g, '/');
+                            const value = utils.parseValue(valueStr);
+                            lastTransaction = { date, description: desc.trim(), value };
+                        } else if(lastTransaction && continuationRegex.test(line.trim())) {
+                            lastTransaction.description += ' ' + line.trim();
+                        } else if (lastTransaction){
+                             transactions.push(lastTransaction);
+                             lastTransaction = null;
+                        }
+                    }
+                    if(lastTransaction) transactions.push(lastTransaction);
+                    return transactions;
+                },
+                nubank: (text, year) => {
+                    const transactions = [];
+                    const lines = text.split('\n');
+                    let currentDate = '';
+                    let currentMode = ''; 
+                    const dateRegex = /^(\d{2})\s+([A-Z]{3})\s+(\d{4})/;
+                    const mesMap = { 'JAN': '01', 'FEV': '02', 'MAR': '03', 'ABR': '04', 'MAI': '05', 'JUN': '06', 'JUL': '07', 'AGO': '08', 'SET': '09', 'OUT': '10', 'NOV': '11', 'DEZ': '12' };
+                    
+                    for (let i = 0; i < lines.length; i++) {
+                        let line = lines[i].trim();
+                        if (line.toUpperCase().includes('SALDO')) continue;
+                        const dateMatch = line.match(dateRegex);
+                        if (dateMatch) {
+                            currentDate = `${dateMatch[1]}/${mesMap[dateMatch[2]]}/${dateMatch[3]}`;
+                        } else if (line.startsWith('Total de entradas')) {
+                            currentMode = 'entradas';
+                        } else if (line.startsWith('Total de saídas')) {
+                            currentMode = 'saidas';
+                        } else {
+                            const valueMatch = line.match(/(-?[\d.,]+)$/);
+                            if (valueMatch && (line.length > valueMatch[0].length)) {
+                                let description = line.substring(0, line.length - valueMatch[0].length).trim();
+                                let value = utils.parseValue(valueMatch[0]);
+
+                                for (let j = i + 1; j < lines.length; j++) {
+                                    const nextLine = lines[j].trim();
+                                    if (/^(\d{2})\s+[A-Z]{3}\s+(\d{4})/.test(nextLine) || nextLine.startsWith('Total de')) break;
+                                    if (!nextLine.match(/(-?[\d.,]+)$/)) {
+                                        description += ' ' + nextLine;
+                                        i = j;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                
+                                if (currentMode === 'saidas' && value > 0) value = -value;
+                                if(currentDate) transactions.push({ date: currentDate, description: description, value: value });
+                            }
+                        }
+                    }
+                    return transactions;
+                },
+                sicredi: (text, year) => {
+                    const transactions = [];
+                    const lines = text.split('\n').filter(line => line.trim() !== '');
+                    const creditKeywords = ['RECEBIMENTO', 'PIX_CRED', 'SOBRPP', 'LIQ.COBRANCA', 'PIX CRED'];
+                    const debitKeywords = ['PAGAMENTO', 'COMPRAS', 'IOF', 'JUROS', 'ENC', 'DEBITO', 'TARIFA'];
+
+                    for(const line of lines) {
+                        if (line.toUpperCase().includes('SALDO ANTERIOR')) continue;
+                        const match = line.match(/^(\d{2}\/\d{2}\/\d{4})\s+(.+?)\s+([A-Z0-9.-]+)\s+(-?[\d.,]+)\s+(-?[\d.,]+)/);
+                        if(match) {
+                            const [_, date, description, doc, valueStr] = match;
+                            let value = utils.parseValue(valueStr);
+
+                            if (value > 0) {
+                                const descUpper = description.toUpperCase();
+                                const isDebit = debitKeywords.some(k => descUpper.includes(k));
+                                if (isDebit) {
+                                    value = -value;
+                                }
+                            }
+                            
+                            transactions.push({ date, description: description.trim(), value });
+                        }
+                    }
+                    return transactions;
+                },
+            },
+            getParser(bankKey) { return this.bankParsers[bankKey] || this.genericParser; }
+        };
         
-        function exportarAprendizados() { const d = JSON.stringify(loadLearnedPatterns(), null, 2); downloadFile(d, "aprendizados.json", "application/json"); }
-        function importarAprendizados(event) { const f = event.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = (e) => { try { const j = JSON.parse(e.target.result); if (typeof j === 'object' && j !== null) { saveLearnedPatterns(j); showAlert("Padrões importados."); mostrarAprendizados(); } else { throw new Error("Formato inválido"); } } catch (e) { showAlert("Erro ao importar JSON."); } }; r.readAsText(f); }
+        // =================================================================================
+        // MÓDULO PRINCIPAL DA APLICAÇÃO (main.js)
+        // =================================================================================
+        const app = {
+            async handleFileUpload(files) {
+                for (const file of files) {
+                    if (!state.getState().filesToProcess.some(f => f.name === file.name)) {
+                        const text = await this.readPdfFile(file).catch(() => '');
+                        const detectedBank = parsers.detectBank(text);
+                        const year = parsers.findYearInText(text);
+                        state.addFile({ file, name: file.name, selectedBank: detectedBank, text, year, id: `file_${Date.now()}` });
+                    }
+                }
+                dom.renderFileList(state.getState().filesToProcess);
+                dom.elements.processButton.disabled = state.getState().filesToProcess.length === 0;
+            },
+            async readPdfFile(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        try {
+                            if (!window.pdfjsLib) return reject(new Error("PDF.js não carregado."));
+                            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js`;
+                            const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(e.target.result) }).promise;
+                            let fullText = '';
+                            for (let i = 1; i <= pdf.numPages; i++) {
+                                const page = await pdf.getPage(i);
+                                const textContent = await page.getTextContent();
+                                let lastY = -1;
+                                let line = '';
+                                for (const item of textContent.items) {
+                                    if (lastY !== -1 && Math.abs(item.transform[5] - lastY) > 5) {
+                                        fullText += line.trim() + '\n';
+                                        line = '';
+                                    }
+                                    line += item.str + ' ';
+                                    lastY = item.transform[5];
+                                }
+                                fullText += line.trim() + '\n';
+                            }
+                            resolve(fullText);
+                        } catch (error) { reject(error); }
+                    };
+                    reader.onerror = reject;
+                    reader.readAsArrayBuffer(file);
+                });
+            },
+            async processFiles() {
+                dom.toggleLoading(true);
+                const appState = state.getState();
+                appState.income = []; appState.expenses = []; appState.selfTransfers = [];
+                const identifiers = this.getIdentifiers();
+                if (identifiers.length === 0) {
+                    dom.showAlert('Por favor, insira o nome completo.');
+                    dom.toggleLoading(false);
+                    return;
+                }
+                for (const fileWrapper of appState.filesToProcess) {
+                    const parserFn = parsers.getParser(fileWrapper.selectedBank);
+                    const transactions = parserFn(fileWrapper.text, fileWrapper.year);
+                    await this.classifyAndProcess(transactions, identifiers, fileWrapper.selectedBank);
+                }
+                this.updateDashboard();
+                dom.toggleLoading(false);
+            },
+            getIdentifiers() {
+                 const userName = document.getElementById('userName').value.trim().toLowerCase();
+                 const otherIds = document.getElementById('identifiers').value.trim().toLowerCase();
+                 return [userName, ...otherIds.split(',').map(i => i.trim())].filter(Boolean);
+            },
+            async classifyAndProcess(transactions, identifiers, bankName) {
+                const minValue = utils.parseValue(document.getElementById("minValue").value) || 0;
+                const maxValue = utils.parseValue(document.getElementById("maxValue").value) || 0;
+                const learnedPatterns = this.loadLearnedPatterns();
+                const appState = state.getState();
+                for (const t of transactions) {
+                    const absValue = Math.abs(t.value);
+                    if (t.value === 0 || (minValue > 0 && absValue < minValue) || (maxValue > 0 && absValue > maxValue)) continue;
+                    t.id = `tx_${Date.now()}_${Math.random()}`;
+                    t.bank = bankName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    const descKey = t.description.toLowerCase().trim();
+                    let category = learnedPatterns[descKey];
+                    if (!category) {
+                        const isSelf = identifiers.some(id => descKey.includes(id));
+                        if (isSelf) category = 'self';
+                        else if (t.value > 0 && config.KEYWORDS_ENTRADA.some(k => descKey.includes(k))) category = 'entrada';
+                        else if (t.value < 0 && config.KEYWORDS_SAIDA.some(k => descKey.includes(k))) category = 'saida';
+                        else category = await this.askForClassification(t);
+                        if (category && category !== 'ignorar') {
+                            learnedPatterns[descKey] = category;
+                            this.saveLearnedPatterns(learnedPatterns);
+                        }
+                    }
+                    if (category === 'self') appState.selfTransfers.push(t);
+                    else if (category === 'entrada') appState.income.push(t);
+                    else if (category === 'saida') appState.expenses.push(t);
+                }
+            },
+            askForClassification(transaction) {
+                return new Promise(resolve => {
+                    state.getState().classificationPromise = { transaction, resolve };
+                    dom.elements.transactionDescription.textContent = transaction.description;
+                    dom.showModal(dom.elements.classificationModal);
+                });
+            },
+            updateDashboard() {
+                const showSelf = dom.elements.showSelfTransfers.checked;
+                const tipoFiltro = dom.elements.filterType.value;
+                const visibleTransactions = this.getVisibleTransactions(tipoFiltro, showSelf);
+                const stats = this.calculateDashboardStats(visibleTransactions);
+                const creditMetrics = this.calculateCreditMetrics();
+                dom.renderDashboard(visibleTransactions, stats);
+                dom.renderCreditAnalysis(creditMetrics);
+            },
+            getVisibleTransactions(tipoFiltro, showSelf) {
+                const appState = state.getState();
+                let transactions = [];
+                if (tipoFiltro === 'self') return appState.selfTransfers.map(t => ({ ...t, tipo: 'self' }));
+                if (tipoFiltro === 'todos' || tipoFiltro === 'entrada') transactions.push(...appState.income.map(t => ({ ...t, tipo: 'entrada' })));
+                if (tipoFiltro === 'todos' || tipoFiltro === 'saida') transactions.push(...appState.expenses.map(t => ({ ...t, tipo: 'saida' })));
+                if (showSelf) {
+                    const currentIds = new Set(transactions.map(t => t.id));
+                    transactions.push(...appState.selfTransfers.filter(t => !currentIds.has(t.id)).map(t => ({ ...t, tipo: 'self' })));
+                }
+                return transactions.sort((a,b) => new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-')));
+            },
+            calculateDashboardStats(transactions) {
+                const totalEntradas = transactions.filter(t => t.value > 0).reduce((acc, t) => acc + t.value, 0);
+                const totalSaidas = transactions.filter(t => t.value < 0).reduce((acc, t) => acc + t.value, 0);
+                return { totalEntradas, totalSaidas, saldo: totalEntradas + totalSaidas };
+            },
+            calculateCreditMetrics() {
+                const showSelf = dom.elements.showSelfTransfers.checked;
+                let transacoes = [...state.getState().income, ...state.getState().expenses];
+                if (showSelf) transacoes = transacoes.concat(state.getState().selfTransfers);
+                const totalEntradas = transacoes.filter(t => t.value > 0).reduce((s, t) => s + t.value, 0);
+                const totalSaidas = transacoes.filter(t => t.value < 0).reduce((s, t) => s + t.value, 0);
+                const comprometimento = (totalEntradas > 0) ? `${((Math.abs(totalSaidas) / totalEntradas) * 100).toFixed(1)}%` : '0%';
+                return { rendaLiquida: totalEntradas, comprometimento };
+            },
+            loadLearnedPatterns: () => JSON.parse(localStorage.getItem("aprendizadoTransacoes") || "{}"),
+            saveLearnedPatterns: (data) => localStorage.setItem("aprendizadoTransacoes", JSON.stringify(data)),
+            loadUserInfo: () => {
+                document.getElementById('userName').value = localStorage.getItem("userName") || '';
+                document.getElementById('identifiers').value = localStorage.getItem("userIdentifiers") || '';
+            },
+            saveUserInfo: () => {
+                localStorage.setItem("userName", document.getElementById("userName").value.trim());
+                localStorage.setItem("userIdentifiers", document.getElementById("identifiers").value.trim());
+                dom.showAlert("Informações salvas com sucesso.");
+            },
+        };
+
+        // =================================================================================
+        // MÓDULO DE EVENTOS (events.js)
+        // =================================================================================
+        const events = {
+            init() {
+                document.addEventListener('DOMContentLoaded', () => app.loadUserInfo());
+                document.getElementById('pdfUpload').addEventListener('change', (e) => app.handleFileUpload(e.target.files));
+                dom.elements.processButton.addEventListener('click', () => app.processFiles());
+                document.getElementById('save-info-button').addEventListener('click', () => app.saveUserInfo());
+                dom.elements.showSelfTransfers.addEventListener('change', () => app.updateDashboard());
+                dom.elements.filterType.addEventListener('change', () => app.updateDashboard());
+                dom.elements.fileList.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('remove-file-button')) {
+                        state.removeFile(parseInt(e.target.dataset.index, 10));
+                        dom.renderFileList(state.getState().filesToProcess);
+                    }
+                });
+                dom.elements.fileList.addEventListener('change', (e) => {
+                    if (e.target.classList.contains('bank-select')) {
+                        state.updateFileBank(parseInt(e.target.dataset.index, 10), e.target.value);
+                    }
+                });
+                dom.elements.dashboardTableBody.addEventListener('click', (e) => {
+                    const target = e.target.closest('button');
+                    if (!target) return;
+                    const id = target.dataset.id;
+                    const appState = state.getState();
+                    if (target.classList.contains('toggle-fixo-button')) {
+                        if (appState.transacoesFixas.has(id)) appState.transacoesFixas.delete(id); else appState.transacoesFixas.add(id);
+                    } else if (target.classList.contains('remove-tx-button')) {
+                        appState.income = appState.income.filter(t => t.id !== id);
+                        appState.expenses = appState.expenses.filter(t => t.id !== id);
+                        appState.selfTransfers = appState.selfTransfers.filter(t => t.id !== id);
+                    }
+                    app.updateDashboard();
+                });
+                document.getElementById('alert-ok-button').addEventListener('click', () => dom.closeAlert());
+                document.getElementById('add-manual-button').addEventListener('click', () => dom.showModal(dom.elements.manualModal));
+                document.getElementById('cancel-manual-button').addEventListener('click', () => dom.hideModal(dom.elements.manualModal));
+                document.getElementById('save-manual-button').addEventListener('click', this.saveManualTransaction);
+                document.getElementById('classification-buttons').addEventListener('click', (e) => {
+                    const category = e.target.dataset.classify;
+                    if (category) {
+                        const promise = state.getState().classificationPromise;
+                        if (promise) {
+                            if (category !== 'ignorar') state.getState().lastClassification = { transaction: promise.transaction, category };
+                            promise.resolve(category);
+                            state.getState().classificationPromise = null;
+                            dom.hideModal(dom.elements.classificationModal);
+                        }
+                    } else if (e.target.id === 'undo-classification-button') this.undoLastClassification();
+                });
+                document.getElementById('manage-patterns-button').addEventListener('click', () => {
+                    dom.renderLearnedPatterns(app.loadLearnedPatterns());
+                    dom.showModal(dom.elements.aprendizadoModal);
+                });
+                dom.elements.listaAprendizados.addEventListener('click', (e) => {
+                    if(e.target.classList.contains('remove-pattern-button')) {
+                        const patterns = app.loadLearnedPatterns();
+                        delete patterns[e.target.dataset.desc];
+                        app.saveLearnedPatterns(patterns);
+                        dom.renderLearnedPatterns(patterns);
+                    }
+                });
+                document.getElementById('close-patterns-button').addEventListener('click', () => dom.hideModal(dom.elements.aprendizadoModal));
+                document.getElementById('export-patterns-button').addEventListener('click', this.exportPatterns);
+                document.getElementById('import-patterns-button').addEventListener('click', () => dom.elements.importPatternsInput.click());
+                dom.elements.importPatternsInput.addEventListener('change', this.importPatterns);
+                document.getElementById('export-xlsx-button').addEventListener('click', this.exportXLSX);
+                document.getElementById('export-pdf-button').addEventListener('click', this.exportPDF);
+                ['minValue', 'maxValue', 'rendaComprovada', 'manualValor'].forEach(id => {
+                    document.getElementById(id).addEventListener('input', (e) => utils.formatCurrencyInput(e.target));
+                });
+            },
+            saveManualTransaction() {
+                const date = document.getElementById("manualDate").value;
+                const desc = document.getElementById("manualDesc").value;
+                let val = utils.parseValue(document.getElementById("manualValor").value);
+                const tipo = document.getElementById("manualTipo").value;
+                if (tipo === 'saida' && val > 0) val = -val;
+                if (tipo === 'entrada' && val < 0) val = Math.abs(val);
+                if (!date || !desc || isNaN(val)) return dom.showAlert("Preencha todos os campos corretamente.");
+                const t = { id: `manual_${Date.now()}`, date, description: desc, value: val, bank: "Manual" };
+                const appState = state.getState();
+                if (tipo === 'entrada') appState.income.push(t);
+                else if (tipo === 'saida') appState.expenses.push(t);
+                else appState.selfTransfers.push(t);
+                dom.hideModal(dom.elements.manualModal);
+                app.updateDashboard();
+            },
+            undoLastClassification() {
+                const appState = state.getState();
+                const last = appState.lastClassification;
+                if (!last) return dom.showAlert("Nenhuma classificação anterior para reverter.");
+                if (last.category === 'entrada') appState.income = appState.income.filter(t => t.id !== last.transaction.id);
+                else if (last.category === 'saida') appState.expenses = appState.expenses.filter(t => t.id !== last.transaction.id);
+                else if (last.category === 'self') appState.selfTransfers = appState.selfTransfers.filter(t => t.id !== last.transaction.id);
+                const patterns = app.loadLearnedPatterns();
+                delete patterns[last.transaction.description.toLowerCase().trim()];
+                app.saveLearnedPatterns(patterns);
+                appState.lastClassification = null;
+                dom.hideModal(dom.elements.classificationModal);
+                if (appState.classificationPromise) {
+                    appState.classificationPromise.resolve('ignorar');
+                    appState.classificationPromise = null;
+                }
+                dom.showAlert(`Classificação de "${last.transaction.description}" foi desfeita.`);
+                app.updateDashboard();
+            },
+            exportPatterns() { utils.downloadFile(JSON.stringify(app.loadLearnedPatterns(), null, 2), "analisador_padroes.json", "application/json"); },
+            importPatterns(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        if (typeof json === 'object' && json !== null) {
+                            app.saveLearnedPatterns(json);
+                            dom.showAlert("Padrões importados com sucesso.");
+                            dom.renderLearnedPatterns(json);
+                        } else throw new Error("Formato inválido.");
+                    } catch (err) { dom.showAlert("Erro ao importar o arquivo JSON."); }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            },
+            exportXLSX() {
+                const appState = state.getState();
+                const showSelf = dom.elements.showSelfTransfers.checked;
+                if (!showSelf && appState.selfTransfers.length > 0) dom.showAlert("Atenção: as transferências 'para mim' foram ignoradas no relatório. Marque a caixa para incluí-las.");
+                if (appState.income.length === 0 && appState.expenses.length === 0) return dom.showAlert("Não há dados para exportar.");
+                const wb = XLSX.utils.book_new();
+                const selfData = showSelf ? appState.selfTransfers.map(t => ({ Data: t.date, Banco: t.bank, Descrição: t.description, Valor: t.value })) : [];
+                const incomeData = appState.income.map(t => ({ Data: t.date, Banco: t.bank, Descrição: t.description, Valor: t.value }));
+                const expenseData = appState.expenses.map(t => ({ Data: t.date, Banco: t.bank, Descrição: t.description, Valor: t.value }));
+                const creditMetrics = app.calculateCreditMetrics();
+                const scoreData = [{'Renda Líquida Estimada': creditMetrics.rendaLiquida, 'Comprometimento': creditMetrics.comprometimento}];
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(scoreData), "Análise de Crédito");
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(incomeData), "Entradas");
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expenseData), "Saídas");
+                if (showSelf && selfData.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(selfData), "Para Mim");
+                XLSX.writeFile(wb, `Relatorio_Financeiro_${new Date().toISOString().slice(0,10)}.xlsx`);
+            },
+            exportPDF() {
+                const appState = state.getState();
+                const showSelf = dom.elements.showSelfTransfers.checked;
+                if (!showSelf && appState.selfTransfers.length > 0) dom.showAlert("Atenção: as transferências 'para mim' foram ignoradas no relatório. Marque a caixa para incluí-las.");
+                if (appState.income.length === 0 && appState.expenses.length === 0) return dom.showAlert("Não há dados para exportar.");
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                doc.setFontSize(18); doc.text("Relatório Financeiro e de Crédito", 14, 22);
+                const creditMetrics = app.calculateCreditMetrics();
+                const rendaComprovada = utils.parseValue(document.getElementById('rendaComprovada').value || '0');
+                doc.setFontSize(12); doc.text("Resumo de Crédito", 14, 32);
+                doc.setFontSize(10);
+                doc.text(`Renda Comprovada: ${utils.formatCurrency(rendaComprovada)}`, 14, 40);
+                doc.text(`Renda Líquida Estimada (Extratos): ${utils.formatCurrency(creditMetrics.rendaLiquida)}`, 14, 46);
+                doc.text(`Comprometimento de Renda: ${creditMetrics.comprometimento}`, 14, 52);
+                const head = [['Data', 'Banco', 'Descrição', 'Valor']];
+                let startY = 60;
+                if (appState.income.length > 0) {
+                    doc.autoTable({ startY, head, body: appState.income.map(t => [t.date, t.bank, t.description, utils.formatCurrency(t.value)]), headStyles: { fillColor: [22, 160, 133] }, didDrawPage: (data) => { doc.setFontSize(14); doc.text("Entradas", 14, data.cursor.y - 10); } });
+                    startY = doc.autoTable.previous.finalY + 10;
+                }
+                if (appState.expenses.length > 0) {
+                    doc.autoTable({ startY, head, body: appState.expenses.map(t => [t.date, t.bank, t.description, utils.formatCurrency(t.value)]), headStyles: { fillColor: [192, 57, 43] }, didDrawPage: (data) => { doc.setFontSize(14); doc.text("Saídas", 14, data.cursor.y - 10); } });
+                    startY = doc.autoTable.previous.finalY + 10;
+                }
+                if (showSelf && appState.selfTransfers.length > 0) {
+                    doc.autoTable({ startY, head, body: appState.selfTransfers.map(t => [t.date, t.bank, t.description, utils.formatCurrency(t.value)]), headStyles: { fillColor: [149, 165, 166] }, didDrawPage: (data) => { doc.setFontSize(14); doc.text("Transferências Para Mim", 14, data.cursor.y - 10); } });
+                }
+                doc.save(`Relatorio_Financeiro_${new Date().toISOString().slice(0,10)}.pdf`);
+            }
+        };
+
+        // =================================================================================
+        // PONTO DE ENTRADA DA APLICAÇÃO
+        // =================================================================================
+        events.init();
+
     </script>
 </body>
 </html>
