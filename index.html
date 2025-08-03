@@ -6,8 +6,6 @@
     <title>Sessão Cinema em Casa</title>
     <!-- Tailwind CSS para estilização -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons para ícones -->
-    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         /* Estilo para garantir que o contêiner de sugestões fique sobre outros elementos */
         #suggestions-container {
@@ -15,7 +13,19 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans p-4 sm:p-8">
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans p-4 sm:p-8 transition-colors duration-500">
+
+    <!-- Modal para o nome do usuário -->
+    <div id="nickname-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
+            <h2 class="text-2xl font-bold mb-4">Bem-vindo(a)!</h2>
+            <p class="mb-4 text-gray-600 dark:text-gray-300">Qual é o seu nome ou apelido para a sessão?</p>
+            <input type="text" id="nickname-input" class="w-full p-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Seu nome">
+            <button id="save-nickname-button" class="mt-4 w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300">
+                Começar
+            </button>
+        </div>
+    </div>
 
     <div id="app-root" class="max-w-4xl mx-auto">
         <header class="text-center mb-8">
@@ -34,18 +44,9 @@
                     <input
                         type="text"
                         id="movie-input"
-                        placeholder="Nome do filme (ex: Interestelar)"
+                        placeholder="Pesquise e adicione um filme"
                         class="flex-1 p-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <button
-                        type="submit"
-                        id="add-movie-button"
-                        class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
-                        disabled
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-film"><path d="M22 17H2a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h20a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2z"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
-                        Adicionar Filme
-                    </button>
                 </form>
 
                 <!-- Container para a lista de sugestões -->
@@ -88,7 +89,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Variáveis de configuração
         const firebaseConfig = {
@@ -107,11 +108,15 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         let userId = null;
+        let userNickname = localStorage.getItem('userNickname') || null;
 
         // Elementos do DOM
+        const appRoot = document.getElementById('app-root');
+        const nicknameModal = document.getElementById('nickname-modal');
+        const nicknameInput = document.getElementById('nickname-input');
+        const saveNicknameButton = document.getElementById('save-nickname-button');
         const movieInput = document.getElementById('movie-input');
         const addMovieForm = document.getElementById('add-movie-form');
-        const addMovieButton = document.getElementById('add-movie-button');
         const drawMovieButton = document.getElementById('draw-movie-button');
         const moviesList = document.getElementById('movies-list');
         const noMoviesMessage = document.getElementById('no-movies-message');
@@ -131,7 +136,7 @@
         // Função para exibir mensagens
         const showMessage = (msg, isError = false) => {
             const container = isError ? errorContainer : messageContainer;
-            container.innerHTML = `<div class="p-4 ${isError ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'} rounded-2xl font-medium">${msg}</div>`;
+            container.innerHTML = `<div class="p-4 ${isError ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' : 'bg-green-100 text-green-700 dark:bg-green-300'} rounded-2xl font-medium">${msg}</div>`;
             setTimeout(() => {
                 container.innerHTML = '';
             }, 5000);
@@ -142,10 +147,12 @@
             if (movies.length === 0) {
                 noMoviesMessage.classList.remove('hidden');
                 moviesList.innerHTML = ''; // Limpa a lista
+                drawMovieButton.disabled = true; // Desabilita o botão de sorteio
             } else {
                 noMoviesMessage.classList.add('hidden');
-                moviesList.innerHTML = movies.map(movie => `
-                    <div class="flex gap-4 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-lg transform transition-transform duration-300 hover:scale-[1.01]">
+                const sortedMovies = movies.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+                moviesList.innerHTML = sortedMovies.map(movie => `
+                    <div class="flex gap-4 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl">
                         <img
                             src="${movie.poster_path ? `https://image.tmdb.org/t/p/w200${movie.poster_path}` : 'https://placehold.co/200x300/e2e8f0/000000?text=Sem+Poster'}"
                             alt="Pôster do filme ${movie.title}"
@@ -165,6 +172,7 @@
                             <p class="mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-300 line-clamp-3">
                                 ${movie.overview || 'Sinopse não disponível.'}
                             </p>
+                            <div class="mt-2 text-sm text-gray-400">Adicionado por: ${movie.addedBy}</div>
                             <div class="mt-4 flex gap-2">
                                 ${!movie.isWatched ? `
                                     <button onclick="markAsWatched('${movie.id}')" class="bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-green-700 transition">
@@ -176,11 +184,20 @@
                                         Desmarcar
                                     </button>
                                 `}
+                                ${userNickname && movie.addedBy === userNickname ? `
+                                    <button onclick="removeMovie('${movie.id}')" class="bg-red-600 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-red-700 transition flex items-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                        Remover
+                                    </button>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
                 `).join('');
-                lucide.createIcons(); // Inicializa os ícones após a renderização
+
+                // Habilita o botão de sorteio se houver filmes
+                const unwatchedMovies = movies.filter(m => !m.isWatched);
+                drawMovieButton.disabled = unwatchedMovies.length === 0;
             }
         };
 
@@ -253,89 +270,78 @@
                     poster_path: li.dataset.moviePoster,
                     overview: li.dataset.movieOverview,
                     vote_average: parseFloat(li.dataset.movieRating),
-                    isWatched: false,
-                    createdAt: new Date(),
-                    addedBy: userId,
                 };
                 addMovieToFirestore(movie);
             }
         });
-
-        // Lógica de autenticação e busca inicial
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                userId = user.uid;
-                // Listener para a coleção de filmes
-                const moviesCollection = collection(db, 'movies');
-                onSnapshot(moviesCollection, (snapshot) => {
-                    allMovies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    renderMovies(allMovies);
-                }, (error) => {
-                    console.error("Erro ao buscar filmes:", error);
-                    showMessage("Erro ao carregar a lista de filmes.", true);
-                });
+        
+        // Inicializa o app após o DOM carregar
+        window.onload = () => {
+             // Checa se o nickname já está salvo
+            if (!userNickname) {
+                nicknameModal.classList.remove('hidden');
             } else {
-                try {
-                    await signInAnonymously(auth);
-                } catch (error) {
-                    console.error("Falha ao autenticar anonimamente:", error);
-                    showMessage("Erro de autenticação.", true);
-                }
+                nicknameModal.classList.add('hidden');
+                 // Inicia a autenticação do Firebase se o nickname existir
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        // Listener para a coleção de filmes
+                        const moviesCollection = collection(db, 'movies');
+                        onSnapshot(moviesCollection, (snapshot) => {
+                            allMovies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            renderMovies(allMovies);
+                        }, (error) => {
+                            console.error("Erro ao buscar filmes:", error);
+                            showMessage("Erro ao carregar a lista de filmes. Verifique as regras do Firebase.", true);
+                        });
+                    } else {
+                        try {
+                            await signInAnonymously(auth);
+                        } catch (error) {
+                            console.error("Falha ao autenticar anonimamente:", error);
+                            showMessage("Erro de autenticação. Por favor, verifique a configuração do seu projeto.", true);
+                        }
+                    }
+                });
+            }
+        };
+
+        // Event listener do modal de nickname
+        saveNicknameButton.addEventListener('click', () => {
+            const nickname = nicknameInput.value.trim();
+            if (nickname) {
+                localStorage.setItem('userNickname', nickname);
+                userNickname = nickname;
+                nicknameModal.classList.add('hidden');
+                window.location.reload(); // Recarrega a página para inicializar o app com o nickname
             }
         });
+
 
         // Função para adicionar um filme ao Firestore
         const addMovieToFirestore = async (movie) => {
             if (isLoading) return;
             isLoading = true;
-            addMovieButton.disabled = true;
-
+            
             try {
                 const moviesCollection = collection(db, 'movies');
-                await addDoc(moviesCollection, movie);
+                await addDoc(moviesCollection, {
+                    ...movie,
+                    isWatched: false,
+                    createdAt: new Date(),
+                    addedBy: userNickname,
+                });
                 movieInput.value = '';
                 suggestionsContainer.classList.add('hidden');
                 showMessage(`Filme "${movie.title}" adicionado com sucesso!`);
             } catch (error) {
                 console.error("Erro ao adicionar filme:", error);
-                showMessage("Ocorreu um erro ao adicionar o filme.", true);
+                showMessage("Ocorreu um erro ao adicionar o filme. Verifique as regras do Firebase.", true);
             } finally {
                 isLoading = false;
-                addMovieButton.disabled = false;
             }
         };
-
-        // Event listener para o formulário
-        addMovieForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const movieName = movieInput.value;
-            if (!movieName) return;
-            
-            try {
-                const tmdbUrl = `https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(movieName)}&language=pt-BR`;
-                const response = await fetch(tmdbUrl);
-                const data = await response.json();
-
-                if (data.results && data.results.length > 0) {
-                    const movie = data.results[0];
-                    const movieData = {
-                        title: movie.title,
-                        poster_path: movie.poster_path,
-                        overview: movie.overview,
-                        vote_average: movie.vote_average,
-                        isWatched: false,
-                        createdAt: new Date(),
-                        addedBy: userId,
-                    };
-                    addMovieToFirestore(movieData);
-                } else {
-                    showMessage(`Filme "${movieName}" não encontrado. Tente outro nome.`, true);
-                }
-            } catch (error) {
-                console.error("Erro ao buscar filme:", error);
-                showMessage("Ocorreu um erro ao buscar o filme.", true);
-            }
-        });
 
         // Event listener para o botão de sortear
         drawMovieButton.addEventListener('click', () => {
@@ -380,6 +386,20 @@
             } catch (error) {
                 console.error("Erro ao desmarcar o filme:", error);
                 showMessage("Ocorreu um erro ao atualizar o filme.", true);
+            }
+        };
+
+        // Função global para remover filme (chamada do HTML)
+        window.removeMovie = async (movieId) => {
+            if (window.confirm("Tem certeza que deseja remover este filme?")) {
+                try {
+                    const movieRef = doc(db, 'movies', movieId);
+                    await deleteDoc(movieRef);
+                    showMessage("Filme removido com sucesso!");
+                } catch (error) {
+                    console.error("Erro ao remover o filme:", error);
+                    showMessage("Ocorreu um erro ao remover o filme.", true);
+                }
             }
         };
 
