@@ -301,6 +301,7 @@
             const li = e.target.closest('li');
             if (li) {
                 const movie = {
+                    id: li.dataset.movieId,
                     title: li.dataset.movieTitle,
                     poster_path: li.dataset.moviePoster,
                     overview: li.dataset.movieOverview,
@@ -359,6 +360,14 @@
             if (isLoading) return;
             isLoading = true;
             
+            // Verifica se o filme já existe
+            const movieExists = allMovies.some(m => m.movieId === movie.id);
+            if (movieExists) {
+                showMessage(`O filme "${movie.title}" já está na lista!`, true);
+                isLoading = false;
+                return;
+            }
+
             try {
                 const moviesCollection = collection(db, 'movies');
                 await addDoc(moviesCollection, {
